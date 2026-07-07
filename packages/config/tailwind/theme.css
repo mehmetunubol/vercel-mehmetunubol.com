@@ -1,0 +1,76 @@
+/**
+ * Shared Tailwind CSS v4 preset (CSS-first `@theme`).
+ *
+ * Baseline design tokens only — a neutral palette, one brand accent, fonts,
+ * radii, and shadows. Apps and packages extend this by importing it and adding
+ * their own `@theme` blocks; do not add app-specific tokens here.
+ *
+ * Usage (in a consuming app's global stylesheet):
+ *   @import "tailwindcss";
+ *   @import "@repo/config/tailwind";
+ */
+
+@theme {
+  /* Fonts — apps may override --font-sans with a next/font variable. */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+
+  /* Neutral surface/text scale. */
+  --color-neutral-50: oklch(0.985 0 0);
+  --color-neutral-100: oklch(0.967 0.001 286);
+  --color-neutral-200: oklch(0.92 0.004 286);
+  --color-neutral-300: oklch(0.871 0.006 286);
+  --color-neutral-400: oklch(0.705 0.015 286);
+  --color-neutral-500: oklch(0.552 0.016 286);
+  --color-neutral-600: oklch(0.442 0.017 286);
+  --color-neutral-700: oklch(0.37 0.013 286);
+  --color-neutral-800: oklch(0.274 0.006 286);
+  --color-neutral-900: oklch(0.21 0.006 286);
+  --color-neutral-950: oklch(0.141 0.005 286);
+
+  /* Brand accent (indigo-ish). */
+  --color-brand-50: oklch(0.962 0.018 272);
+  --color-brand-100: oklch(0.93 0.034 272);
+  --color-brand-200: oklch(0.87 0.065 272);
+  --color-brand-300: oklch(0.785 0.115 272);
+  --color-brand-400: oklch(0.673 0.17 273);
+  --color-brand-500: oklch(0.585 0.2 274);
+  --color-brand-600: oklch(0.511 0.21 275);
+  --color-brand-700: oklch(0.457 0.19 276);
+  --color-brand-800: oklch(0.398 0.155 276);
+  --color-brand-900: oklch(0.353 0.12 277);
+  --color-brand-950: oklch(0.257 0.08 278);
+
+  /* Semantic aliases used by shared UI components. */
+  --color-background: var(--color-neutral-50);
+  --color-foreground: var(--color-neutral-900);
+  --color-muted: var(--color-neutral-500);
+  --color-border: var(--color-neutral-200);
+  --color-accent: var(--color-brand-600);
+  --color-accent-foreground: var(--color-neutral-50);
+
+  /* Radii. */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  /* Shadows. */
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.04), 0 4px 12px oklch(0 0 0 / 0.06);
+}
+
+/* Dark mode: flip semantic aliases. Enabled via the `.dark` class on <html>. */
+@variant dark (&:where(.dark, .dark *));
+
+.dark {
+  --color-background: var(--color-neutral-950);
+  --color-foreground: var(--color-neutral-100);
+  --color-muted: var(--color-neutral-400);
+  --color-border: var(--color-neutral-800);
+  --color-accent: var(--color-brand-400);
+  --color-accent-foreground: var(--color-neutral-950);
+}

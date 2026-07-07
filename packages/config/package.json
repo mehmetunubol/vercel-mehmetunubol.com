@@ -1,0 +1,44 @@
+{
+  "name": "@repo/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./tsconfig.nextjs.json": "./tsconfig.nextjs.json",
+    "./tsconfig.react-lib.json": "./tsconfig.react-lib.json",
+    "./eslint": "./eslint.config.js",
+    "./eslint/next": "./eslint.next.js",
+    "./tailwind": "./tailwind/theme.css"
+  },
+  "files": [
+    "tsconfig.base.json",
+    "tsconfig.nextjs.json",
+    "tsconfig.react-lib.json",
+    "eslint.config.js",
+    "eslint.next.js",
+    "tailwind"
+  ],
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "clean": "rm -rf .turbo node_modules"
+  },
+  "dependencies": {
+    "@eslint/js": "^9.39.4",
+    "@next/eslint-plugin-next": "^16.2.10",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.7.0",
+    "typescript-eslint": "^8.63.0"
+  },
+  "peerDependencies": {
+    "eslint": "^9.39.4",
+    "typescript": "^6.0.3"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.4",
+    "typescript": "^6.0.3"
+  }
+}

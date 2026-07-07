@@ -1,0 +1,23 @@
+{
+  "name": "mehmetunubol.com",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Personal site + multi-app Turborepo monorepo",
+  "packageManager": "pnpm@10.15.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json,css}\"",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "turbo": "^2.10.4",
+    "typescript": "^6.0.3"
+  }
+}

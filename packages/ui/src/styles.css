@@ -1,0 +1,8 @@
+/**
+ * Optional shared component styles for @repo/ui.
+ *
+ * Components are styled with Tailwind utility classes that the consuming app
+ * compiles (add `@source` for this package in the app's global stylesheet).
+ * Keep this file for genuinely global, utility-independent component CSS only —
+ * currently intentionally empty.
+ */

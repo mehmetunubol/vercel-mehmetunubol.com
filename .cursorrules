@@ -1,0 +1,101 @@
+# Cursor Rules — Personal Site + Multi-App Monorepo
+
+## Project Overview
+This is a Turborepo monorepo containing a personal website (the "shell") plus
+multiple independent applications ("apps"). Apps may be deployed either as:
+  - subpaths of the main domain (e.g. example.com/app-name), or
+  - standalone subdomains (e.g. app-name.example.com)
+depending on the app. Deployment target is decided per-app, not globally —
+never assume one routing strategy applies to all apps.
+
+Apps are functionally INDEPENDENT: they do not share state, auth, or business
+logic with each other. The only thing shared across apps is presentation:
+UI components, design tokens, and the visual "shell" (header/footer/nav/theme).
+Do not introduce cross-app state, shared stores, or shared auth sessions
+unless explicitly asked — this is a deliberate architectural boundary, not
+an oversight.
+
+## Monorepo Structure
+- `apps/web` — the main personal website / shell (marketing pages, home, nav
+  into other apps).
+- `apps/<app-name>` — one folder per application. Each is a self-contained
+  Next.js app with its own routing, own local state, own data layer.
+- `packages/ui` — shared, presentational-only component library (buttons,
+  layout primitives, header/footer, theme provider, design tokens). No
+  business logic. No app-specific state. No data fetching.
+- `packages/config` — shared `tsconfig.base.json`, ESLint config, Tailwind
+  config/preset, shared constants (e.g. brand colors, fonts).
+- `packages/types` (optional, create if needed) — shared TypeScript types
+  that are genuinely cross-cutting (e.g. shared UI prop types), NOT app
+  domain models.
+
+When adding a new app: scaffold it under `apps/<name>`, wire it into
+`turbo.json` pipelines, give it its own `package.json`, and only import from
+`packages/ui` and `packages/config`. Never import one app's code from
+another app.
+
+## Language & Tooling
+- TypeScript everywhere, `strict: true`. No `any` unless justified with a
+  comment explaining why; prefer `unknown` + narrowing.
+- Framework: Next.js (App Router) for `apps/web` and every app in `apps/*`,
+  for consistency and easy subpath/subdomain routing.
+- Package manager: pnpm workspaces + Turborepo for task orchestration/caching.
+- Styling: Tailwind CSS, consuming the shared preset from `packages/config`.
+  Component-level styles stay colocated with components.
+- Linting/formatting: shared ESLint + Prettier config from `packages/config`;
+  do not create per-app lint configs that diverge from the shared base
+  without a clear reason.
+
+## Routing & Deployment Conventions
+- Subpath apps: handled via Next.js rewrites/middleware in `apps/web` (or a
+  reverse proxy at the infra layer) routing `/app-name/*` to the app's
+  build output. Keep this routing logic centralized and documented, not
+  duplicated per app.
+- Subdomain apps: deployed as fully separate Next.js projects/deployments
+  with their own domain config. They still consume `packages/ui` and
+  `packages/config` for visual consistency, but are otherwise independent
+  deployables — don't couple their build to `apps/web`.
+- Never hardcode absolute domains inside `packages/ui`. Shell components
+  take navigation targets (app name, path/URL) as props/config, not
+  hardcoded links.
+
+## Shared UI Package Rules (`packages/ui`)
+- Presentational only. No `useEffect` data fetching, no global state, no
+  auth checks. If a component needs data, it takes props — the consuming
+  app supplies them.
+- No app-specific business logic or copy leaks into `packages/ui`. Generic
+  names only (e.g. `PrimaryButton`, not `SignupButton`).
+- Every component should be usable identically whether rendered inside
+  `apps/web` or any `apps/<name>` — treat it as a published design system.
+- Export via a single index/barrel file per component group; keep the
+  public API of the package intentional and minimal.
+
+## State Management
+- Each app manages its own local state independently. Default to React
+  state/Context for simple cases; introduce a lightweight library (Zustand
+  is the default recommendation) only within an app when local state grows
+  complex — do not add a shared cross-app store.
+- Do not build a shared auth/session layer across apps unless a future
+  requirement explicitly calls for it. If that requirement appears, treat
+  it as a deliberate architecture change, not an incremental addition —
+  flag it before implementing.
+
+## Code Style
+- Functional components, no class components.
+- Named exports for components; default export only for Next.js
+  page/layout files where required by convention.
+- Co-locate a component's types with the component unless the type is
+  genuinely shared (then it goes in `packages/ui` or `packages/types`).
+- Prefer composition over prop-drilling deep component trees; extract
+  smaller components rather than adding boolean "mode" props.
+- Write self-documenting code; add comments only for non-obvious "why",
+  not "what".
+
+## What NOT to do
+- Don't import directly between `apps/*` folders.
+- Don't put business logic, fetch calls, or environment-specific code
+  inside `packages/ui`.
+- Don't assume all apps share the same deployment/routing strategy —
+  check per-app config before writing routing code.
+- Don't introduce a shared global state/auth solution without explicit
+  sign-off, even if it seems convenient for a new feature.
