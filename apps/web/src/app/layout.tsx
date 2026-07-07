@@ -15,16 +15,16 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Mehmet Ünübol — Back-end Developer",
+    default: "Mehmet Ünübol — Full-Stack Software Engineer",
     template: "%s — Mehmet Ünübol",
   },
   description:
-    "Mehmet Ünübol is a back-end developer based in İzmir, Türkiye, specializing in Node.js, TypeScript, and full-stack development.",
+    "Mehmet Ünübol is a full-stack software engineer based in İzmir, Türkiye with 10+ years of experience, specializing in Node.js, TypeScript, and cloud-native microservices.",
   metadataBase: new URL("https://mehmetunubol.com"),
   openGraph: {
-    title: "Mehmet Ünübol — Back-end Developer",
+    title: "Mehmet Ünübol — Full-Stack Software Engineer",
     description:
-      "Back-end developer based in İzmir, Türkiye, specializing in Node.js, TypeScript, and full-stack development.",
+      "Full-stack software engineer based in İzmir, Türkiye with 10+ years of experience, specializing in Node.js, TypeScript, and cloud-native microservices.",
     url: "https://mehmetunubol.com",
     siteName: "mehmetunubol.com",
     locale: "en_US",

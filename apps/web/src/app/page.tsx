@@ -11,6 +11,7 @@ export default function Home() {
         <HeroSection />
         <ExperienceSection />
         <SkillsSection />
+        <ProjectsSection />
         <ContactSection />
       </div>
     </Shell>
@@ -106,10 +107,10 @@ function CodeCard() {
           {"  "}name: <span className="text-emerald-400">&quot;{site.name}&quot;</span>,{"\n"}
           {"  "}role: <span className="text-emerald-400">&quot;{site.title}&quot;</span>,{"\n"}
           {"  "}stack: [
-          {site.skills.slice(0, 3).map((skill, index) => (
+          {site.skills.map((skill, index) => (
             <span key={skill}>
               <span className="text-emerald-400">&quot;{skill}&quot;</span>
-              {index < 2 ? ", " : ""}
+              {index < site.skills.length - 1 ? ", " : ""}
             </span>
           ))}
           ],{"\n"}
@@ -128,23 +129,83 @@ function ExperienceSection() {
     <section id="experience" className="flex scroll-mt-24 flex-col gap-10">
       <SectionHeading index="01" title="Experience" />
       <div className="relative flex flex-col gap-3 border-l border-border pl-6 sm:pl-8">
-        {site.experience.map((job, index) => (
-          <Reveal key={`${job.company}-${job.period}`} delayMs={index * 70} className="group relative">
-            <span className="absolute -left-[1.85rem] top-2 h-3 w-3 rounded-full border-2 border-background bg-border transition-colors group-hover:bg-accent sm:-left-[2.35rem]" />
-            <div className="rounded-lg border border-border bg-[var(--color-surface)] p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-accent/40">
-              <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-                <div className="flex flex-col gap-0.5">
-                  <span className="font-medium">{job.role}</span>
-                  <span className="text-sm text-muted">
-                    {job.company}
-                    {job.location ? ` · ${job.location}` : ""}
-                  </span>
+        {site.experience.map((job, index) => {
+          const hasDetails = Boolean(job.summary || job.highlights || job.tech);
+          return (
+            <Reveal
+              key={`${job.company}-${job.period}`}
+              delayMs={index * 70}
+              className="group relative"
+            >
+              <span className="absolute -left-[1.85rem] top-2 h-3 w-3 rounded-full border-2 border-background bg-border transition-colors group-hover:bg-accent sm:-left-[2.35rem]" />
+              <div
+                tabIndex={hasDetails ? 0 : undefined}
+                className="rounded-lg border border-border bg-[var(--color-surface)] p-5 outline-none transition-all duration-300 hover:-translate-y-0.5 hover:border-accent/40 focus-visible:border-accent/40 focus-visible:ring-2 focus-visible:ring-accent/40"
+              >
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">{job.role}</span>
+                      {job.tag ? (
+                        <Badge variant="outline" className="px-2 py-0 text-[0.65rem]">
+                          {job.tag}
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <span className="text-sm text-muted">
+                      {job.company}
+                      {job.location ? ` · ${job.location}` : ""}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {hasDetails ? (
+                      <span className="hidden font-mono text-[0.65rem] text-muted/60 md:inline md:group-hover:hidden md:group-focus-within:hidden">
+                        details ↓
+                      </span>
+                    ) : null}
+                    <span className="font-mono text-xs text-muted">{job.period}</span>
+                  </div>
                 </div>
-                <span className="font-mono text-xs text-muted">{job.period}</span>
+
+                {hasDetails ? (
+                  <div className="grid grid-rows-[1fr] opacity-100 transition-all duration-500 ease-out md:grid-rows-[0fr] md:opacity-0 md:group-hover:grid-rows-[1fr] md:group-hover:opacity-100 md:group-focus-within:grid-rows-[1fr] md:group-focus-within:opacity-100">
+                    <div className="overflow-hidden">
+                      <div className="flex flex-col gap-3 pt-4">
+                        {job.summary ? (
+                          <p className="text-sm text-muted">{job.summary}</p>
+                        ) : null}
+                        {job.highlights ? (
+                          <ul className="flex flex-col gap-1.5 text-sm text-muted">
+                            {job.highlights.map((item) => (
+                              <li key={item} className="flex gap-2.5">
+                                <span aria-hidden className="mt-1 text-accent">
+                                  &#9656;
+                                </span>
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                        {job.tech ? (
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {job.tech.map((tech) => (
+                              <span
+                                key={tech}
+                                className="rounded-md border border-border px-2 py-0.5 font-mono text-[0.7rem] text-muted"
+                              >
+                                {tech}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
-            </div>
-          </Reveal>
-        ))}
+            </Reveal>
+          );
+        })}
       </div>
     </section>
   );
@@ -155,18 +216,38 @@ function SkillsSection() {
     <section id="skills" className="flex scroll-mt-24 flex-col gap-10">
       <SectionHeading index="02" title="Skills" />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {site.skills.map((skill, index) => (
-          <Reveal key={skill} delayMs={index * 60}>
-            <div className="group flex items-center gap-3 rounded-lg border border-border bg-[var(--color-surface)] p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-accent/40">
-              <span className="font-mono text-xs text-accent">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              <span className="text-sm font-medium">{skill}</span>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {site.skillGroups.map((group, index) => (
+          <Reveal key={group.label} delayMs={index * 50}>
+            <div className="group flex h-full flex-col gap-3 rounded-lg border border-border bg-[var(--color-surface)] p-5 transition-colors duration-300 hover:border-accent/40">
+              <h3 className="font-mono text-xs uppercase tracking-widest text-accent">
+                {group.label}
+              </h3>
+              <div className="flex flex-wrap gap-1.5">
+                {group.items.map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-md border border-border px-2 py-1 text-xs text-muted transition-colors group-hover:text-foreground"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
             </div>
           </Reveal>
         ))}
       </div>
+
+      <Reveal>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-mono text-xs text-muted">languages:</span>
+          {site.languages.map((language) => (
+            <Badge key={language} variant="outline">
+              {language}
+            </Badge>
+          ))}
+        </div>
+      </Reveal>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Reveal>
@@ -178,7 +259,10 @@ function SkillsSection() {
                   <div key={edu.degree} className="flex flex-col gap-1">
                     <span className="font-medium">{edu.degree}</span>
                     <span className="text-sm text-muted">{edu.school}</span>
-                    <span className="font-mono text-xs text-muted">{edu.period}</span>
+                    <span className="font-mono text-xs text-muted">
+                      {edu.period}
+                      {edu.note ? ` · ${edu.note}` : ""}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -210,6 +294,65 @@ function SkillsSection() {
   );
 }
 
+function ProjectsSection() {
+  return (
+    <section id="projects" className="flex scroll-mt-24 flex-col gap-10">
+      <SectionHeading index="03" title="Projects" />
+      <div className="grid gap-4 sm:grid-cols-2">
+        {site.projects.map((project, index) => (
+          <Reveal key={project.name} delayMs={index * 70}>
+            <ProjectCard project={project} />
+          </Reveal>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ProjectCard({ project }: { project: (typeof site.projects)[number] }) {
+  const external = project.href?.startsWith("http");
+  const content = (
+    <div className="flex h-full flex-col gap-3 rounded-lg border border-border bg-[var(--color-surface)] p-6 transition-all duration-300 hover:-translate-y-0.5 hover:border-accent/40">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="font-medium">{project.name}</h3>
+        {project.href ? (
+          <span
+            aria-hidden
+            className="font-mono text-muted transition-transform group-hover/card:translate-x-0.5 group-hover/card:text-accent"
+          >
+            ↗
+          </span>
+        ) : null}
+      </div>
+      <p className="flex-1 text-sm leading-relaxed text-muted">{project.description}</p>
+      <div className="flex flex-wrap gap-1.5 pt-1">
+        {project.tech.map((tech) => (
+          <span
+            key={tech}
+            className="rounded-md border border-border px-2 py-0.5 font-mono text-[0.7rem] text-muted"
+          >
+            {tech}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (!project.href) {
+    return content;
+  }
+
+  return (
+    <a
+      href={project.href}
+      className="group/card block h-full"
+      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+    >
+      {content}
+    </a>
+  );
+}
+
 function ContactSection() {
   return (
     <section id="contact" className="scroll-mt-24">
@@ -220,7 +363,7 @@ function ContactSection() {
             className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-accent/20 blur-3xl"
           />
           <div className="relative flex flex-col gap-4">
-            <span className="font-mono text-xs text-accent">03 / contact</span>
+            <span className="font-mono text-xs text-accent">04 / contact</span>
             <h2 className="max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">
               Let&rsquo;s build something reliable.
             </h2>
