@@ -48,7 +48,7 @@ export function Reveal({ delayMs = 0, once = true, className, style, ...props }:
       data-visible={visible}
       style={{ transitionDelay: `${delayMs}ms`, ...style }}
       className={cn(
-        "translate-y-6 opacity-0 blur-[3px] transition-[opacity,transform,filter] duration-700 ease-out will-change-transform",
+        "min-w-0 translate-y-6 opacity-0 blur-[3px] transition-[opacity,transform,filter] duration-700 ease-out will-change-transform",
         "data-[visible=true]:translate-y-0 data-[visible=true]:opacity-100 data-[visible=true]:blur-none",
         "motion-reduce:translate-y-0 motion-reduce:opacity-100 motion-reduce:blur-none motion-reduce:transition-none",
         className,

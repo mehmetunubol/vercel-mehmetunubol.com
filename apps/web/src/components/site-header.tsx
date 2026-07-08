@@ -46,7 +46,7 @@ export function SiteHeader() {
               key={item.href}
               href={item.href}
               className={cn(
-                "group flex items-center gap-1.5 rounded-md px-3 py-1.5 font-mono text-xs transition-colors",
+                "flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 font-mono text-xs transition-colors sm:px-3",
                 isActive ? "text-accent" : "text-muted hover:text-foreground",
               )}
             >

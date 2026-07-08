@@ -21,9 +21,9 @@ export default function Home() {
 function HeroSection() {
   return (
     <section id="about" className="scroll-mt-24 pt-6 sm:pt-10">
-      <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="flex flex-col gap-6">
-          <Reveal>
+      <div className="grid min-w-0 items-center gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-12">
+        <div className="flex min-w-0 flex-col gap-5 sm:gap-6">
+          <Reveal className="min-w-0">
             <Badge variant="accent">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
@@ -33,24 +33,26 @@ function HeroSection() {
             </Badge>
           </Reveal>
 
-          <Reveal delayMs={80}>
-            <p className="font-mono text-sm text-muted">
+          <Reveal delayMs={80} className="min-w-0">
+            <p className="break-words font-mono text-sm text-muted">
               <span className="text-accent">const</span> role ={" "}
               <span className="text-foreground">&quot;{site.title}&quot;</span>
             </p>
           </Reveal>
 
-          <Reveal delayMs={140}>
-            <h1 className="text-gradient text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl">
+          <Reveal delayMs={140} className="min-w-0">
+            <h1 className="text-gradient text-4xl font-bold leading-[1.05] tracking-tight break-words sm:text-5xl lg:text-6xl">
               {site.name}
             </h1>
           </Reveal>
 
-          <Reveal delayMs={200}>
-            <p className="max-w-xl text-lg leading-relaxed text-muted">{site.summary}</p>
+          <Reveal delayMs={200} className="min-w-0">
+            <p className="max-w-xl text-base leading-relaxed text-muted sm:text-lg">
+              {site.summary}
+            </p>
           </Reveal>
 
-          <Reveal delayMs={260}>
+          <Reveal delayMs={260} className="min-w-0">
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <a
                 href={`mailto:${site.email}`}
@@ -72,9 +74,10 @@ function HeroSection() {
             </div>
           </Reveal>
 
-          <Reveal delayMs={320}>
-            <p className="pt-2 font-mono text-xs text-muted">
-              <span className="text-accent">@</span> {site.location} &nbsp;·&nbsp;{" "}
+          <Reveal delayMs={320} className="min-w-0">
+            <p className="break-words pt-2 font-mono text-xs text-muted">
+              <span className="text-accent">@</span> {site.location}
+              <span className="mx-1.5">·</span>
               <a href={`mailto:${site.email}`} className="transition-colors hover:text-foreground">
                 {site.email}
               </a>
@@ -82,7 +85,7 @@ function HeroSection() {
           </Reveal>
         </div>
 
-        <Reveal delayMs={200} className="lg:justify-self-end">
+        <Reveal delayMs={200} className="min-w-0 w-full lg:justify-self-end">
           <CodeCard />
         </Reveal>
       </div>
@@ -92,29 +95,30 @@ function HeroSection() {
 
 function CodeCard() {
   return (
-    <div className="w-full max-w-md overflow-hidden rounded-xl border border-border bg-[var(--color-surface)] shadow-card">
+    <div className="w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-[var(--color-surface)] shadow-card sm:max-w-md">
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
         <span className="h-3 w-3 rounded-full bg-red-400/80" />
         <span className="h-3 w-3 rounded-full bg-yellow-400/80" />
         <span className="h-3 w-3 rounded-full bg-green-400/80" />
         <span className="ml-2 font-mono text-xs text-muted">developer.ts</span>
       </div>
-      <pre className="overflow-x-auto p-5 font-mono text-[0.8rem] leading-relaxed">
-        <code>
+      <pre className="max-w-full overflow-x-auto p-4 font-mono text-[0.72rem] leading-relaxed sm:p-5 sm:text-[0.8rem]">
+        <code className="block whitespace-pre">
           <span className="text-accent">const</span>{" "}
           <span className="text-foreground">engineer</span> = {"{"}
           {"\n"}
           {"  "}name: <span className="text-emerald-400">&quot;{site.name}&quot;</span>,{"\n"}
           {"  "}role: <span className="text-emerald-400">&quot;{site.title}&quot;</span>,{"\n"}
-          {"  "}stack: [
-          {site.skills.map((skill, index) => (
+          {"  "}stack: [{"\n"}
+          {site.skills.map((skill) => (
             <span key={skill}>
-              <span className="text-emerald-400">&quot;{skill}&quot;</span>
-              {index < site.skills.length - 1 ? ", " : ""}
+              {"    "}
+              <span className="text-emerald-400">&quot;{skill}&quot;</span>,{"\n"}
             </span>
           ))}
-          ],{"\n"}
-          {"  "}location: <span className="text-emerald-400">&quot;{site.location}&quot;</span>,{"\n"}
+          {"  "}],{"\n"}
+          {"  "}location: <span className="text-emerald-400">&quot;{site.location}&quot;</span>,
+          {"\n"}
           {"  "}available: <span className="text-accent">true</span>,{"\n"}
           {"}"};
           <span className="ml-0.5 inline-block h-4 w-2 translate-y-0.5 animate-pulse bg-accent" />
