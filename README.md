@@ -59,6 +59,48 @@ To work on a single app:
 pnpm --filter web dev
 ```
 
+## Deploying `apps/web` to Vercel
+
+`apps/web` is a static-first Next.js app and deploys cleanly on Vercel with the
+monorepo-aware zero-config path:
+
+1. **Import the repo** into Vercel (New Project → import this Git repository).
+2. **Set the Root Directory** to `apps/web`. Vercel auto-detects Next.js, pnpm
+   workspaces, and Turborepo, installs dependencies from the workspace root, and
+   builds with the correct Turborepo filter. No `vercel.json` is required.
+3. **Add environment variables** (Production + Preview), see `apps/web/.env.example`:
+   - `NEXT_PUBLIC_SITE_URL` — your canonical origin, e.g. `https://mehmetunubol.com`
+     (drives metadata, canonical URLs, `sitemap.xml`, and `robots.txt`).
+   - `GOOGLE_SITE_VERIFICATION` — optional Search Console token.
+4. **Deploy**, then point your domain at the project in Vercel → Settings → Domains.
+
+Node version is pinned via `.nvmrc` / `engines` (Node 22).
+
+### Domain: `www` → apex
+
+The canonical origin is the apex `https://mehmetunubol.com` (matches
+`NEXT_PUBLIC_SITE_URL`, committed as a non-secret default in `apps/web/.env`).
+Add **both** domains in Vercel → Settings → Domains and set `www.mehmetunubol.com`
+to **redirect to the apex** (`mehmetunubol.com`) so there's a single canonical
+host for SEO. Typical DNS:
+
+- Apex `mehmetunubol.com` → **A** `76.76.21.21` (or ALIAS/ANAME → `cname.vercel-dns.com`)
+- `www` → **CNAME** `cname.vercel-dns.com`
+
+Vercel provisions SSL automatically once DNS resolves. Per-environment overrides
+of `NEXT_PUBLIC_SITE_URL` (e.g. a staging domain) go in the Vercel dashboard;
+local secrets go in `.env.local` (gitignored).
+
+### SEO checklist after first deploy
+
+- Confirm `https://<domain>/robots.txt` and `https://<domain>/sitemap.xml` resolve.
+- Verify the domain in [Google Search Console](https://search.google.com/search-console)
+  and submit the sitemap.
+- Check the social preview (Open Graph / Twitter) — a branded card is generated
+  at `/opengraph-image`.
+- Structured data (schema.org `Person` + `WebSite`) is embedded as JSON-LD;
+  validate it with the [Rich Results Test](https://search.google.com/test/rich-results).
+
 ## Adding a new app
 
 1. Scaffold under `apps/<name>` with `npx create-next-app@latest` (latest stable).

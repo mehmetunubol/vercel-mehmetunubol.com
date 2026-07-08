@@ -15,8 +15,8 @@ build
 # testing
 coverage
 
-# env
-.env
+# env — commit non-secret defaults (.env, .env.example), ignore local/secret overrides
+.env.local
 .env*.local
 
 # logs

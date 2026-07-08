@@ -40,9 +40,11 @@ export interface SocialLink {
 
 export const site = {
   name: "Mehmet Ünübol",
-  title: "Full-Stack Software Engineer",
+  title: "Software Engineer",
   tagline: "Node.js · TypeScript · Microservices",
   location: "İzmir, Türkiye",
+  locality: "İzmir",
+  country: "TR",
   email: "mehmetunubol@gmail.com",
   summary:
     "Full-stack software engineer with 10+ years delivering scalable, secure, and high-performance systems across telecom, automotive, and SaaS. I focus on back-end with Node.js and TypeScript — modernizing legacy systems and leading cloud-native microservices migrations.",
