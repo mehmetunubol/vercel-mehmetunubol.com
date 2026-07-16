@@ -53,6 +53,7 @@ export const site = {
     { label: "Experience", href: "#experience" },
     { label: "Skills", href: "#skills" },
     { label: "Projects", href: "#projects" },
+    { label: "Blog", href: "/blog" },
     { label: "Contact", href: "#contact" },
   ] satisfies NavItem[],
   skills: ["Node.js", "TypeScript", "Microservices"],

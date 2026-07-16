@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@repo/config/tailwind";
+@plugin "@tailwindcss/typography";
 
 /* Compile Tailwind classes used by the shared UI package (JIT source). */
 @source "../../../../packages/ui/src";
