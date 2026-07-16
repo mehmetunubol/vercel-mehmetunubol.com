@@ -1,0 +1,12 @@
+{
+  "title": "What is the Saga Microservices Pattern?",
+  "category": "software-engineering",
+  "categoryLabel": "Software Engineering",
+  "slug": "what-is-the-saga-microservices-pattern-saga-pattern-e4d22712",
+  "date": "20250705",
+  "sourceUrl": "https://www.youtube.com/watch?v=eTTCIJZNPdo",
+  "uploader": "Java Guides",
+  "html": "<br>\n<strong>Key Technical Concepts:</strong><br>\n- Saga pattern for distributed systems transaction handling<br>\n- Local transactions vs distributed transactions<br>\n- Compensating transactions for rollback<br>\n- Choreography vs orchestration coordination<br>\n- Event-driven & command-driven coordination<br>\n<br>\n<strong>Architecture Decisions:</strong><br>\n- Breaking long-running transaction into smaller local transactions<br>\n- Each service handles own database & logic<br>\n- No global lock or distributed transaction<br>\n- Orchestrator role: order service in example<br>\n<br>\n<strong>Flow:</strong><br>\n1. Order service creates order in pending state<br>\n2. Call inventory service: reserve items<br>\n3. Call payment service: charge customer<br>\n4. Confirm order<br>\nOn failure: trigger compensating transactions (release reserved stock, update order to cancelled)<br>\n<br>\n<strong>Best Practices:</strong><br>\n- Always have compensating actions plan for failure<br>\n- Use events or commands for coordination<br>\n- Keep workflow as local steps<br>\n<br>\n<strong>Specific Technologies, Frameworks, Libraries:</strong><br>\n- Java ecosystem<br>\n- Spring Boot<br>\n- Message brokers: Kafka, RabbitMQ<br>\n- Orchestration engines: Camunda, Temporal, Netflix Conductor<br>",
+  "mermaid": "sequenceDiagram\n    participant Customer\n    participant OrderService as Order Service (Orchestrator)\n    participant InventoryService as Inventory Service\n    participant PaymentService as Payment Service\n    \n    Customer->>OrderService: Place order\n    OrderService->>OrderService: Create order (pending)\n    OrderService->>InventoryService: Reserve items\n    InventoryService-->>OrderService: Success\n    OrderService->>PaymentService: Process payment\n    alt Payment success\n        PaymentService-->>OrderService: Success\n        OrderService->>OrderService: Confirm order\n    else Payment failure\n        PaymentService-->>OrderService: Failure\n        OrderService->>InventoryService: Release reserved stock\n        OrderService->>OrderService: Update order to cancelled\n    end",
+  "publishedAt": "2026-07-16T22:12:43.282Z"
+}

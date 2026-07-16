@@ -35,8 +35,9 @@ export function SiteHeader() {
 
   return (
     <>
-      <ScrollProgress />
+      <ScrollProgress className="print:hidden" />
       <Header
+        className="print:hidden"
         brand={
           <Link href="/" className="group flex items-center gap-2 font-mono text-sm">
             <span className="grid h-6 w-6 place-items-center rounded bg-accent text-xs font-bold text-accent-foreground transition-transform group-hover:-rotate-6">

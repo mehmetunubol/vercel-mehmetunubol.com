@@ -104,6 +104,23 @@
   }
 }
 
+/* Printing (used by the blog post "Download PDF" action). */
+@media print {
+  body::before,
+  body::after {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  .prose {
+    color: #000 !important;
+  }
+}
+
 /* Reusable presentational helpers for this app. */
 @utility text-gradient {
   background-image: linear-gradient(

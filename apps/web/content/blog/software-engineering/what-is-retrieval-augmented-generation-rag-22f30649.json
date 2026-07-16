@@ -1,0 +1,12 @@
+{
+  "title": "What is Retrieval-Augmented Generation (RAG)?",
+  "category": "software-engineering",
+  "categoryLabel": "Software Engineering",
+  "slug": "what-is-retrieval-augmented-generation-rag-22f30649",
+  "date": "20230823",
+  "sourceUrl": "https://www.youtube.com/watch?v=T-D1OfcDW1M",
+  "uploader": "IBM Technology",
+  "html": "\n<ul>\n<li><strong>Core Concept:</strong> Retrieval Augmented Generation (RAG) framework</li>\n<li><strong>Problem:</strong> Large language models (LLMs) have 2 challenges: no source for answer + out-of-date information</li>\n<li><strong>Solution:</strong> Add retrieval step before generation. LLM instruction: first retrieve relevant content from content store, combine with user query, then generate response</li>\n<li><strong>Content Store:</strong> Can be open (internet) or closed (collection of documents, policies)</li>\n<li><strong>Benefit 1:</strong> Out-of-date problem solved - update data store with new info instead of retraining model</li>\n<li><strong>Benefit 2:</strong> Source problem solved - LLM instructed to pay attention to primary source data before generating, reduces hallucination and data leak</li>\n<li><strong>Additional Benefit:</strong> Model can say \"I don't know\" when user question not reliably answerable from data store</li>\n<li><strong>RAG Prompt Structure:</strong> 3 parts: instruction to pay attention to retrieved content + user question + response</li>\n<li><strong>Risk:</strong> Poor retriever quality means good user query may not get answer</li>\n<li><strong>Research Direction:</strong> IBM working both sides: improve retriever for best quality grounding data + improve generative part for richest response</li>\n<li><strong>Specific Technologies:</strong> Large language models (LLMs), retrieval augmented generation (RAG)</li>\n<li><strong>Organization:</strong> IBM Research</li>\n<li><strong>Person:</strong> Marina Danoletski, senior research scientist</li>\n</ul>",
+  "mermaid": "flowchart TB\n    User[User Query] --> LLM[Large Language Model]\n    subgraph RAG Framework\n        LLM --> Retriever[Retriever]\n        Retriever --> ContentStore[Content Store - open internet or closed document collection]\n        ContentStore --> RetrievedContent[Retrieved relevant content]\n        Retriever --> RetrievedContent\n        RetrievedContent --> LLM\n    end\n    LLM --> Response[Generated Response with evidence]",
+  "publishedAt": "2026-07-16T22:09:05.287Z"
+}

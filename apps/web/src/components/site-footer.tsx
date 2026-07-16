@@ -3,7 +3,7 @@ import { site } from "@/lib/site";
 
 export function SiteFooter() {
   return (
-    <Footer>
+    <Footer className="print:hidden">
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div className="flex flex-col gap-1">
           <p className="font-mono text-xs text-muted">

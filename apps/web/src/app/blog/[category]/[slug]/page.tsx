@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { MermaidDiagram } from "@/components/mermaid-diagram";
 import { BlogPostingStructuredData } from "@/components/blog-posting-structured-data";
+import { PostActions } from "@/components/post-actions";
 import { getAllPosts, getPost, getPostExcerpt } from "@/lib/blog";
 import { siteUrl } from "@/lib/seo";
 
@@ -69,6 +70,8 @@ export default async function BlogPostPage({
             </a>
           </p>
         </div>
+
+        <PostActions title={post.title} />
 
         <div
           className="prose dark:prose-invert max-w-none prose-headings:tracking-tight prose-a:text-accent"
