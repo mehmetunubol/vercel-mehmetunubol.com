@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle, Shell } from "@repo/ui";
+import { Shell } from "@repo/ui";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { PostCard } from "@/components/post-card";
 import { getCategories, getPostsByCategory } from "@/lib/blog";
+import { getCategoryColor } from "@/lib/category-colors";
 
 export async function generateStaticParams() {
   return getCategories().map(({ category }) => ({ category }));
@@ -23,6 +25,7 @@ export default async function BlogCategoryPage({ params }: PageProps<"/blog/[cat
   if (!firstPost) notFound();
 
   const label = firstPost.categoryLabel;
+  const color = getCategoryColor(category);
 
   return (
     <Shell header={<SiteHeader />} footer={<SiteFooter />}>
@@ -31,23 +34,18 @@ export default async function BlogCategoryPage({ params }: PageProps<"/blog/[cat
           <Link href="/blog" className="w-fit text-xs text-muted hover:text-foreground">
             ← All posts
           </Link>
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{label}</h1>
+          <div className="flex items-center gap-3">
+            <span className={`h-3 w-3 rounded-full ${color.dot}`} />
+            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{label}</h1>
+          </div>
+          <p className="text-sm text-muted">
+            {posts.length} post{posts.length === 1 ? "" : "s"}
+          </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {posts.map((post) => (
-            <Link key={post.slug} href={`/blog/${post.category}/${post.slug}`}>
-              <Card className="h-full transition-colors hover:border-accent">
-                <CardHeader>
-                  <CardTitle className="text-base">{post.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs text-muted">
-                    {post.uploader} · {new Date(post.publishedAt).toLocaleDateString("en-US")}
-                  </p>
-                </CardContent>
-              </Card>
-            </Link>
+            <PostCard key={post.slug} post={post} />
           ))}
         </div>
       </div>

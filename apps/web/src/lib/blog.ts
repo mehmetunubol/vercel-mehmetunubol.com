@@ -14,7 +14,14 @@ export interface BlogPost {
   publishedAt: string;
 }
 
+export interface Heading {
+  id: string;
+  text: string;
+  level: number;
+}
+
 const BLOG_CONTENT_DIR = path.join(process.cwd(), "content", "blog");
+const WORDS_PER_MINUTE = 200;
 
 function readPostFile(filePath: string): BlogPost {
   return JSON.parse(fs.readFileSync(filePath, "utf-8"));
@@ -49,13 +56,64 @@ export function getPost(category: string, slug: string): BlogPost | undefined {
   return readPostFile(filePath);
 }
 
-export function getPostExcerpt(post: BlogPost, maxLength = 160): string {
-  const text = post.html
+export function getRelatedPosts(post: BlogPost, limit = 3): BlogPost[] {
+  return getPostsByCategory(post.category)
+    .filter((p) => p.slug !== post.slug)
+    .slice(0, limit);
+}
+
+function stripHtml(html: string): string {
+  return html
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+export function getPostExcerpt(post: BlogPost, maxLength = 160): string {
+  const text = stripHtml(post.html);
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+export function getReadingTime(post: BlogPost): number {
+  const wordCount = stripHtml(post.html).split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(wordCount / WORDS_PER_MINUTE));
+}
+
+function slugifyHeading(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
+/**
+ * Injects id attributes into h2-h4 tags (for TOC anchors) and returns the
+ * extracted heading list alongside the transformed HTML.
+ */
+export function addHeadingIds(html: string): { html: string; headings: Heading[] } {
+  const headings: Heading[] = [];
+  const usedIds = new Set<string>();
+
+  const transformed = html.replace(
+    /<(h[2-4])([^>]*)>([\s\S]*?)<\/\1>/gi,
+    (match, tag: string, attrs: string, inner: string) => {
+      const text = inner.replace(/<[^>]+>/g, "").trim();
+      if (!text) return match;
+
+      let id = slugifyHeading(text) || "section";
+      while (usedIds.has(id)) {
+        id = `${id}-${usedIds.size}`;
+      }
+      usedIds.add(id);
+
+      headings.push({ id, text, level: Number(tag[1]) });
+      return `<${tag}${attrs} id="${id}">${inner}</${tag}>`;
+    }
+  );
+
+  return { html: transformed, headings };
 }
 
 export function getCategories(): { category: string; label: string; count: number }[] {
