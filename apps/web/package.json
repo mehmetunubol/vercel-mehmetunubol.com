@@ -8,10 +8,12 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf .next .turbo node_modules"
+    "clean": "rm -rf .next .turbo node_modules",
+    "generate:cv": "tsx scripts/generate-cv.ts"
   },
   "dependencies": {
     "@repo/ui": "workspace:*",
+    "framer-motion": "^12.42.2",
     "mermaid": "^11.16.0",
     "next": "16.2.10",
     "react": "^19.2.7",
@@ -24,8 +26,13 @@
     "@types/node": "^26.1.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@types/pdfkit": "^0.17.6",
+    "dejavu-fonts-ttf": "^2.37.3",
+    "docx": "^9.7.1",
     "eslint": "^9.39.4",
+    "pdfkit": "^0.19.1",
     "tailwindcss": "^4.3.2",
+    "tsx": "^4.23.1",
     "typescript": "^6.0.3"
   }
 }

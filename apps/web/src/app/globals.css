@@ -17,8 +17,8 @@
   --color-accent-foreground: oklch(0.98 0 0);
   --color-surface: oklch(1 0 0);
   --color-surface-2: oklch(0.98 0.002 286);
-  --grid-line: color-mix(in oklch, var(--color-foreground) 6%, transparent);
-  --glow: color-mix(in oklch, var(--color-accent) 22%, transparent);
+  --grid-line: color-mix(in srgb, var(--color-foreground) 6%, transparent);
+  --glow: color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 
 .dark {
@@ -28,10 +28,10 @@
   --color-border: oklch(0.31 0.02 262);
   --color-accent: oklch(0.72 0.14 244);
   --color-accent-foreground: oklch(0.16 0.02 258);
-  --color-surface: oklch(0.21 0.016 260);
-  --color-surface-2: oklch(0.24 0.018 262);
-  --grid-line: color-mix(in oklch, var(--color-foreground) 8%, transparent);
-  --glow: color-mix(in oklch, var(--color-accent) 26%, transparent);
+  --color-surface: oklch(0.24 0.006 260);
+  --color-surface-2: oklch(0.28 0.007 262);
+  --grid-line: color-mix(in srgb, var(--color-foreground) 8%, transparent);
+  --glow: color-mix(in srgb, var(--color-accent) 36%, transparent);
 }
 
 @layer base {
@@ -76,12 +76,30 @@
     z-index: -1;
     background:
       radial-gradient(50rem 30rem at 50% -8rem, var(--glow), transparent 70%),
-      radial-gradient(36rem 24rem at 100% 8rem, var(--glow), transparent 75%);
-    opacity: 0.7;
+      radial-gradient(36rem 24rem at 100% 8rem, var(--glow), transparent 75%),
+      radial-gradient(30rem 22rem at 0% 60%, var(--glow), transparent 75%);
+    opacity: 0.85;
+    animation: glow-drift 20s ease-in-out infinite;
+  }
+
+  @keyframes glow-drift {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    50% {
+      transform: translate3d(-2%, 2%, 0) scale(1.1);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    body::after {
+      animation: none;
+    }
   }
 
   ::selection {
-    background-color: color-mix(in oklch, var(--color-accent) 30%, transparent);
+    background-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
     color: var(--color-foreground);
   }
 
@@ -119,6 +137,13 @@
   .prose {
     color: #000 !important;
   }
+
+  .text-gradient {
+    animation: none !important;
+    background: none !important;
+    -webkit-text-fill-color: initial !important;
+    color: #000 !important;
+  }
 }
 
 /* Reusable presentational helpers for this app. */
@@ -126,10 +151,44 @@
   background-image: linear-gradient(
     120deg,
     var(--color-foreground) 0%,
-    var(--color-foreground) 45%,
-    var(--color-accent) 100%
+    var(--color-accent) 50%,
+    var(--color-foreground) 100%
   );
+  background-size: 200% auto;
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
+  animation: text-shimmer 7s linear infinite;
+}
+
+@keyframes text-shimmer {
+  to {
+    background-position: -200% center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .text-gradient {
+    animation: none;
+  }
+}
+
+/* Translucent, blurred surface for a "glass" card look. */
+@utility glass {
+  background-color: color-mix(in srgb, var(--color-surface) 78%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid color-mix(in srgb, var(--color-foreground) 14%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--color-foreground) 8%, transparent),
+    0 8px 24px -12px color-mix(in srgb, black 55%, transparent);
+}
+
+/* Accent-colored glow ring, meant to be combined with hover:/focus-visible:. */
+@utility glow-ring {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--color-foreground) 8%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--color-accent) 55%, transparent),
+    0 16px 44px -10px color-mix(in srgb, var(--color-accent) 55%, transparent);
 }

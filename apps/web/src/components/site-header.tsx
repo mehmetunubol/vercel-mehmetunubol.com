@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { Header, ScrollProgress, ThemeToggle, cn } from "@repo/ui";
 import { site } from "@/lib/site";
 
@@ -37,7 +38,7 @@ export function SiteHeader() {
     <>
       <ScrollProgress className="print:hidden" />
       <Header
-        className="print:hidden"
+        className="print:hidden bg-background/50 backdrop-blur-xl"
         brand={
           <Link href="/" className="group flex items-center gap-2 font-mono text-sm">
             <span className="grid h-6 w-6 place-items-center rounded bg-accent text-xs font-bold text-accent-foreground transition-transform group-hover:-rotate-6">
@@ -60,14 +61,26 @@ export function SiteHeader() {
               key={item.href}
               href={href}
               className={cn(
-                "flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 font-mono text-xs transition-colors sm:px-3",
+                "relative flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 font-mono text-xs transition-colors sm:px-3",
                 isActive ? "text-accent" : "text-muted hover:text-foreground",
               )}
             >
-              <span className={cn("text-[0.65rem]", isActive ? "text-accent" : "text-muted/60")}>
+              {isActive ? (
+                <motion.span
+                  layoutId="nav-active-pill"
+                  className="absolute inset-0 rounded-md bg-accent/10"
+                  transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                />
+              ) : null}
+              <span
+                className={cn(
+                  "relative z-10 text-[0.65rem]",
+                  isActive ? "text-accent" : "text-muted/60",
+                )}
+              >
                 {String(index + 1).padStart(2, "0")}
               </span>
-              {item.label}
+              <span className="relative z-10">{item.label}</span>
             </Link>
           );
         })}

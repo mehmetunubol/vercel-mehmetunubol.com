@@ -73,8 +73,11 @@ export default async function BlogPostPage({
                 {post.uploader} · {new Date(post.publishedAt).toLocaleDateString("en-US")} ·{" "}
                 {getReadingTime(post)} min read ·{" "}
                 <a href={post.sourceUrl} target="_blank" rel="noreferrer" className="underline">
-                  source
+                  source video
                 </a>
+              </p>
+              <p className="w-fit rounded-full border border-border px-2.5 py-0.5 text-[0.65rem] text-muted">
+                🤖 AI-generated summary of the source video, published via yt-note-agent
               </p>
             </div>
 

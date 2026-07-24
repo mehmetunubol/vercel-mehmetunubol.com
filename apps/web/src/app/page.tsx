@@ -1,8 +1,13 @@
-import { Badge, Card, Reveal, Shell } from "@repo/ui";
+import { Badge, Reveal, Shell, cn } from "@repo/ui";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { SectionHeading } from "@/components/section-heading";
+import { RotatingWord } from "@/components/rotating-word";
+import { CodeCard } from "@/components/code-card";
 import { site } from "@/lib/site";
+import { getSkillUsage, isActiveSkill } from "@/lib/skill-usage";
+
+const HERO_ROLES = [site.title, ...site.skills] as const;
 
 export default function Home() {
   return (
@@ -36,7 +41,11 @@ function HeroSection() {
           <Reveal delayMs={80} className="min-w-0">
             <p className="break-words font-mono text-sm text-muted">
               <span className="text-accent">const</span> role ={" "}
-              <span className="text-foreground">&quot;{site.title}&quot;</span>
+              <span className="text-foreground">
+                &quot;
+                <RotatingWord words={HERO_ROLES} />
+                &quot;
+              </span>
             </p>
           </Reveal>
 
@@ -71,6 +80,14 @@ function HeroSection() {
               >
                 LinkedIn
               </a>
+              <a
+                href="/MehmetUnubol_CV.pdf"
+                download
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-border px-5 text-sm font-medium transition-colors hover:border-accent/40 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              >
+                Download CV
+                <span aria-hidden>↓</span>
+              </a>
             </div>
           </Reveal>
 
@@ -93,41 +110,6 @@ function HeroSection() {
   );
 }
 
-function CodeCard() {
-  return (
-    <div className="w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-[var(--color-surface)] shadow-card sm:max-w-md">
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <span className="h-3 w-3 rounded-full bg-red-400/80" />
-        <span className="h-3 w-3 rounded-full bg-yellow-400/80" />
-        <span className="h-3 w-3 rounded-full bg-green-400/80" />
-        <span className="ml-2 font-mono text-xs text-muted">developer.ts</span>
-      </div>
-      <pre className="max-w-full overflow-x-auto p-4 font-mono text-[0.72rem] leading-relaxed sm:p-5 sm:text-[0.8rem]">
-        <code className="block whitespace-pre">
-          <span className="text-accent">const</span>{" "}
-          <span className="text-foreground">engineer</span> = {"{"}
-          {"\n"}
-          {"  "}name: <span className="text-emerald-400">&quot;{site.name}&quot;</span>,{"\n"}
-          {"  "}role: <span className="text-emerald-400">&quot;{site.title}&quot;</span>,{"\n"}
-          {"  "}stack: [{"\n"}
-          {site.skills.map((skill) => (
-            <span key={skill}>
-              {"    "}
-              <span className="text-emerald-400">&quot;{skill}&quot;</span>,{"\n"}
-            </span>
-          ))}
-          {"  "}],{"\n"}
-          {"  "}location: <span className="text-emerald-400">&quot;{site.location}&quot;</span>,
-          {"\n"}
-          {"  "}available: <span className="text-accent">true</span>,{"\n"}
-          {"}"};
-          <span className="ml-0.5 inline-block h-4 w-2 translate-y-0.5 animate-pulse bg-accent" />
-        </code>
-      </pre>
-    </div>
-  );
-}
-
 function ExperienceSection() {
   return (
     <section id="experience" className="flex scroll-mt-24 flex-col gap-10">
@@ -144,7 +126,7 @@ function ExperienceSection() {
               <span className="absolute -left-[1.85rem] top-2 h-3 w-3 rounded-full border-2 border-background bg-border transition-colors group-hover:bg-accent sm:-left-[2.35rem]" />
               <div
                 tabIndex={hasDetails ? 0 : undefined}
-                className="rounded-lg border border-border bg-[var(--color-surface)] p-5 outline-none transition-all duration-300 hover:-translate-y-0.5 hover:border-accent/40 focus-visible:border-accent/40 focus-visible:ring-2 focus-visible:ring-accent/40"
+                className="glass rounded-lg p-5 outline-none transition-all duration-300 hover:-translate-y-0.5 hover:glow-ring focus-visible:glow-ring"
               >
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
                   <div className="flex flex-col gap-0.5">
@@ -223,19 +205,34 @@ function SkillsSection() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {site.skillGroups.map((group, index) => (
           <Reveal key={group.label} delayMs={index * 50}>
-            <div className="group flex h-full flex-col gap-3 rounded-lg border border-border bg-[var(--color-surface)] p-5 transition-colors duration-300 hover:border-accent/40">
+            <div className="glass group flex h-full flex-col gap-3 rounded-lg p-5 transition-shadow duration-300 hover:glow-ring">
               <h3 className="font-mono text-xs uppercase tracking-widest text-accent">
                 {group.label}
               </h3>
               <div className="flex flex-wrap gap-1.5">
-                {group.items.map((item) => (
-                  <span
-                    key={item}
-                    className="rounded-md border border-border px-2 py-1 text-xs text-muted transition-colors group-hover:text-foreground"
-                  >
-                    {item}
-                  </span>
-                ))}
+                {group.items.map((item) => {
+                  const active = isActiveSkill(item);
+                  const usage = getSkillUsage(item);
+                  return (
+                    <span key={item} className="group/tag relative">
+                      <span
+                        className={cn(
+                          "rounded-md border px-2 py-1 text-xs transition-colors group-hover:text-foreground",
+                          active
+                            ? "border-accent/50 bg-accent/10 font-medium text-accent"
+                            : "border-border text-muted",
+                        )}
+                      >
+                        {item}
+                      </span>
+                      {usage.length > 0 ? (
+                        <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-max max-w-[220px] -translate-x-1/2 rounded-md border border-border bg-background px-2.5 py-1.5 text-center text-[0.65rem] leading-snug text-foreground opacity-0 shadow-lg transition-opacity duration-200 group-hover/tag:opacity-100">
+                          {usage.join(" · ")}
+                        </span>
+                      ) : null}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           </Reveal>
@@ -255,7 +252,7 @@ function SkillsSection() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Reveal>
-          <Card className="h-full border-border bg-[var(--color-surface)]">
+          <div className="glass h-full rounded-lg transition-shadow duration-300 hover:glow-ring">
             <div className="flex flex-col gap-5 p-6">
               <h3 className="font-mono text-xs uppercase tracking-widest text-accent">Education</h3>
               <div className="flex flex-col gap-5">
@@ -271,11 +268,11 @@ function SkillsSection() {
                 ))}
               </div>
             </div>
-          </Card>
+          </div>
         </Reveal>
 
         <Reveal delayMs={120}>
-          <Card className="h-full border-border bg-[var(--color-surface)]">
+          <div className="glass h-full rounded-lg transition-shadow duration-300 hover:glow-ring">
             <div className="flex flex-col gap-5 p-6">
               <h3 className="font-mono text-xs uppercase tracking-widest text-accent">
                 Certifications
@@ -291,7 +288,7 @@ function SkillsSection() {
                 ))}
               </ul>
             </div>
-          </Card>
+          </div>
         </Reveal>
       </div>
     </section>
@@ -316,7 +313,7 @@ function ProjectsSection() {
 function ProjectCard({ project }: { project: (typeof site.projects)[number] }) {
   const external = project.href?.startsWith("http");
   const content = (
-    <div className="flex h-full flex-col gap-3 rounded-lg border border-border bg-[var(--color-surface)] p-6 transition-all duration-300 hover:-translate-y-0.5 hover:border-accent/40">
+    <div className="glass flex h-full flex-col gap-3 rounded-lg p-6 transition-all duration-300 hover:-translate-y-0.5 hover:glow-ring">
       <div className="flex items-center justify-between gap-3">
         <h3 className="font-medium">{project.name}</h3>
         {project.href ? (
@@ -361,10 +358,14 @@ function ContactSection() {
   return (
     <section id="contact" className="scroll-mt-24">
       <Reveal>
-        <div className="relative overflow-hidden rounded-2xl border border-border bg-[var(--color-surface)] p-8 sm:p-12">
+        <div className="glass relative overflow-hidden rounded-2xl p-8 sm:p-12">
           <div
             aria-hidden
-            className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-accent/20 blur-3xl"
+            className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 animate-pulse rounded-full bg-accent/25 blur-3xl motion-reduce:animate-none"
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-accent/15 blur-3xl"
           />
           <div className="relative flex flex-col gap-4">
             <span className="font-mono text-xs text-accent">04 / contact</span>
@@ -378,7 +379,7 @@ function ContactSection() {
             <div className="flex flex-wrap items-center gap-3 pt-3">
               <a
                 href={`mailto:${site.email}`}
-                className="inline-flex h-11 items-center justify-center rounded-md bg-accent px-5 font-mono text-sm font-medium text-accent-foreground shadow-lg shadow-transparent transition-shadow duration-300 hover:shadow-accent/40"
+                className="inline-flex h-11 items-center justify-center rounded-md bg-accent px-5 font-mono text-sm font-medium text-accent-foreground shadow-lg shadow-transparent transition-shadow duration-300 hover:glow-ring"
               >
                 {site.email}
               </a>
@@ -396,6 +397,7 @@ function ContactSection() {
                   </a>
                 ))}
             </div>
+            <p className="font-mono text-xs text-muted">{site.availability}</p>
           </div>
         </div>
       </Reveal>
