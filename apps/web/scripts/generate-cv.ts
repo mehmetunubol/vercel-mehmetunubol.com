@@ -8,15 +8,35 @@
 import fs from "fs";
 import path from "path";
 import PDFDocument from "pdfkit";
-import {
-  AlignmentType,
-  Document,
-  HeadingLevel,
-  Packer,
-  Paragraph,
-  TextRun,
-} from "docx";
+import { AlignmentType, BorderStyle, Document, Packer, Paragraph, TextRun } from "docx";
 import { site } from "../src/lib/site";
+
+// Matches the original CV template: Cambria headings, Calibri body, 1"
+// top/bottom margins, 1.25" left/right. Sizes trimmed 1pt from the original
+// to make room for section separators/spacing without spilling to a 3rd page.
+const HEADING_FONT = "Cambria";
+const BODY_FONT = "Calibri";
+const PAGE_MARGIN = { top: 1440, bottom: 1440, left: 1800, right: 1800 };
+
+const SECTION_BORDER = {
+  bottom: { style: BorderStyle.SINGLE, size: 6, color: "999999", space: 4 },
+};
+
+function titleRun(text: string): TextRun {
+  return new TextRun({ text, font: HEADING_FONT, size: 44, bold: true, color: "000000" });
+}
+
+function sectionHeadingRun(text: string): TextRun {
+  return new TextRun({ text, font: HEADING_FONT, size: 32, bold: true, color: "000000" });
+}
+
+function sectionHeadingParagraph(text: string): Paragraph {
+  return new Paragraph({
+    spacing: { before: 280, after: 140 },
+    border: SECTION_BORDER,
+    children: [sectionHeadingRun(text)],
+  });
+}
 
 const OUT_DIR = path.join(__dirname, "..", "public");
 const DOCX_PATH = path.join(OUT_DIR, "MehmetUnubol_CV.docx");
@@ -48,21 +68,14 @@ function buildDocx(): Document {
 
   children.push(
     new Paragraph({
-      heading: HeadingLevel.TITLE,
-      children: [new TextRun({ text: site.name, bold: true })],
+      children: [titleRun(site.name)],
     }),
     new Paragraph({
       children: [new TextRun(`${site.location} | ${site.email}`)],
     }),
-    new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun(site.resumeTitle)],
-    }),
+    sectionHeadingParagraph(site.resumeTitle),
     new Paragraph({ children: [new TextRun(site.summary)] }),
-    new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun("Education")],
-    })
+    sectionHeadingParagraph("Education")
   );
 
   for (const edu of site.education) {
@@ -78,10 +91,7 @@ function buildDocx(): Document {
   }
 
   children.push(
-    new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun("Technical Skills")],
-    })
+    sectionHeadingParagraph("Technical Skills")
   );
 
   for (const group of site.skillGroups) {
@@ -96,17 +106,21 @@ function buildDocx(): Document {
   }
 
   children.push(
-    new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun("Professional Experience")],
-    })
+    sectionHeadingParagraph("Professional Experience")
   );
 
   for (const exp of site.experience) {
     children.push(
       new Paragraph({
-        heading: HeadingLevel.HEADING_2,
-        children: [new TextRun(experienceHeaderLine(exp))],
+        children: [
+          new TextRun({
+            text: experienceHeaderLine(exp),
+            font: BODY_FONT,
+            size: 22,
+            bold: true,
+            color: "000000",
+          }),
+        ],
       }),
       new Paragraph({
         children: [new TextRun({ text: experienceMetaLine(exp), italics: true })],
@@ -130,10 +144,7 @@ function buildDocx(): Document {
   }
 
   children.push(
-    new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun("Freelance & Personal Projects")],
-    })
+    sectionHeadingParagraph("Freelance & Personal Projects")
   );
 
   for (const project of site.projects) {
@@ -149,10 +160,7 @@ function buildDocx(): Document {
   }
 
   children.push(
-    new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun("Certifications & Languages")],
-    })
+    sectionHeadingParagraph("Certifications & Languages")
   );
 
   for (const cert of site.certifications) {
@@ -170,7 +178,21 @@ function buildDocx(): Document {
     })
   );
 
-  return new Document({ sections: [{ children }] });
+  return new Document({
+    styles: {
+      default: {
+        document: {
+          run: { font: BODY_FONT, size: 20 },
+        },
+      },
+    },
+    sections: [
+      {
+        properties: { page: { margin: PAGE_MARGIN } },
+        children,
+      },
+    ],
+  });
 }
 
 async function writeDocx(): Promise<void> {
@@ -205,73 +227,79 @@ function writePdf(): Promise<void> {
     stream.on("finish", resolve);
     stream.on("error", reject);
 
-    doc.fontSize(22).font("Bold").text(site.name);
-    doc.fontSize(10).font("Body").text(`${site.location} | ${site.email}`);
+    // Section title + a separator rule underneath, with breathing room
+    // before/after — mirrors the docx's bordered section headings.
+    function sectionHeading(text: string): void {
+      doc.moveDown(0.6);
+      doc.fontSize(13).font("Bold").text(text);
+      const y = doc.y + 2;
+      doc
+        .moveTo(doc.page.margins.left, y)
+        .lineTo(doc.page.width - doc.page.margins.right, y)
+        .strokeColor("#999999")
+        .lineWidth(0.75)
+        .stroke();
+      doc.moveDown(0.5);
+    }
+
+    doc.fontSize(21).font("Bold").text(site.name);
+    doc.fontSize(9).font("Body").text(`${site.location} | ${site.email}`);
     doc.moveDown();
 
-    doc.fontSize(14).font("Bold").text(site.resumeTitle);
-    doc.fontSize(10).font("Body").text(site.summary);
-    doc.moveDown();
+    doc.fontSize(13).font("Bold").text(site.resumeTitle);
+    doc.fontSize(9).font("Body").text(site.summary);
 
-    doc.fontSize(14).font("Bold").text("Education");
-    doc.moveDown(0.3);
+    sectionHeading("Education");
     for (const edu of site.education) {
       doc
-        .fontSize(10)
+        .fontSize(9)
         .font("Body")
         .text(
           `•  ${edu.degree}, ${edu.school} — ${edu.period}${edu.note ? ` (${edu.note})` : ""}`
         );
     }
-    doc.moveDown();
 
-    doc.fontSize(14).font("Bold").text("Technical Skills");
-    doc.moveDown(0.3);
+    sectionHeading("Technical Skills");
     for (const group of site.skillGroups) {
       doc
-        .fontSize(10)
+        .fontSize(9)
         .font("Bold")
         .text(`${group.label}: `, { continued: true })
         .font("Body")
         .text(group.items.join(", "));
     }
-    doc.moveDown();
 
-    doc.fontSize(14).font("Bold").text("Professional Experience");
-    doc.moveDown(0.3);
+    sectionHeading("Professional Experience");
     for (const exp of site.experience) {
-      doc.fontSize(11).font("Bold").text(experienceHeaderLine(exp));
-      doc.fontSize(9).font("Oblique").text(experienceMetaLine(exp));
-      doc.moveDown(0.2);
+      doc.fontSize(10).font("Bold").text(experienceHeaderLine(exp));
+      doc.fontSize(8).font("Oblique").text(experienceMetaLine(exp));
+      doc.moveDown(0.15);
       for (const highlight of exp.highlights ?? []) {
-        doc.fontSize(10).font("Body").text(`•  ${highlight}`);
+        doc.fontSize(9).font("Body").text(`•  ${highlight}`);
       }
       if (exp.tech && exp.tech.length > 0) {
         doc
-          .fontSize(9)
+          .fontSize(8)
           .font("Bold")
           .text("Tech: ", { continued: true })
           .font("Body")
           .text(exp.tech.join(", "));
       }
-      doc.moveDown(0.6);
+      doc.moveDown(0.5);
     }
 
-    doc.fontSize(14).font("Bold").text("Freelance & Personal Projects");
-    doc.moveDown(0.3);
+    sectionHeading("Freelance & Personal Projects");
     for (const project of site.projects) {
       doc
-        .fontSize(10)
+        .fontSize(9)
         .font("Bold")
         .text(`•  ${project.name}`, { continued: true })
         .font("Body")
         .text(` — ${project.description}`);
     }
-    doc.moveDown();
 
-    doc.fontSize(14).font("Bold").text("Certifications & Languages");
-    doc.moveDown(0.3);
-    doc.fontSize(10).font("Body");
+    sectionHeading("Certifications & Languages");
+    doc.fontSize(9).font("Body");
     for (const cert of site.certifications) {
       doc.text(`•  ${cert}`);
     }
