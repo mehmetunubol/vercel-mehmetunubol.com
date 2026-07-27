@@ -1,4 +1,5 @@
 import type { NormalizedJob } from "@/lib/jobs";
+import { decodeHtmlEntities, htmlToPlainText } from "@/lib/html";
 
 interface RemoteOkJob {
   id?: string;
@@ -27,10 +28,10 @@ export async function fetchRemoteOkJobs(): Promise<NormalizedJob[]> {
       source: "remoteok" as const,
       externalId: job.id!,
       url: job.url!,
-      title: job.position!,
-      company: job.company ?? "Unknown",
+      title: decodeHtmlEntities(job.position!),
+      company: decodeHtmlEntities(job.company ?? "Unknown"),
       location: job.location,
-      rawDescription: job.description ?? "",
+      rawDescription: htmlToPlainText(job.description ?? ""),
       postedAt: job.date ? new Date(job.date) : undefined,
     }));
 }
@@ -56,10 +57,10 @@ export async function fetchArbeitnowJobs(): Promise<NormalizedJob[]> {
     source: "arbeitnow",
     externalId: job.slug,
     url: job.url,
-    title: job.title,
-    company: job.company_name,
+    title: decodeHtmlEntities(job.title),
+    company: decodeHtmlEntities(job.company_name),
     location: job.location,
-    rawDescription: job.description ?? "",
+    rawDescription: htmlToPlainText(job.description ?? ""),
     postedAt: job.created_at ? new Date(job.created_at * 1000) : undefined,
   }));
 }

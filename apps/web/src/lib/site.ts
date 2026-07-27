@@ -271,6 +271,13 @@ export const site = {
   ] satisfies EducationItem[],
   projects: [
     {
+      name: "Job Application Helper",
+      description:
+        "Personal job-search assistant — pulls postings from Greenhouse/Lever boards and aggregators, filters them against a configurable keyword list, scores matches against my CV with Gemini, drafts cover letters, and tracks every application on a kanban board. No auto-apply, by design.",
+      href: "https://jah.mehmetunubol.com/",
+      tech: ["Next.js", "Drizzle", "Neon", "Gemini", "Auth.js"],
+    },
+    {
       name: "Petsitter",
       description:
         "Marketplace connecting pet owners with sitters — React frontend, Node.js microservices in a monorepo, Angular admin, and a Go event manager. Deployed on Google Cloud Run with the frontend on Vercel.",

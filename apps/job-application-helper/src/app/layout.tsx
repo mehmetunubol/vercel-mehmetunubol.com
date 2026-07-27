@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { ThemeProvider, themeInitScript } from "@repo/ui";
 import "./globals.css";
 
@@ -6,6 +6,10 @@ export const metadata: Metadata = {
   title: "Job Application Helper",
   description: "Personal job-search assistant.",
   robots: { index: false, follow: false },
+};
+
+export const viewport: Viewport = {
+  colorScheme: "dark light",
 };
 
 export default function RootLayout({

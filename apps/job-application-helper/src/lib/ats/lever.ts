@@ -1,4 +1,5 @@
 import type { NormalizedJob } from "@/lib/jobs";
+import { htmlToPlainText } from "@/lib/html";
 
 interface LeverPosting {
   id: string;
@@ -24,7 +25,9 @@ export async function fetchLeverJobs(site: string, companyName: string): Promise
     title: posting.text,
     company: companyName,
     location: posting.categories?.location,
-    rawDescription: posting.descriptionPlain ?? posting.description ?? "",
+    rawDescription: posting.descriptionPlain
+      ? posting.descriptionPlain
+      : htmlToPlainText(posting.description ?? ""),
     postedAt: posting.createdAt ? new Date(posting.createdAt) : undefined,
   }));
 }

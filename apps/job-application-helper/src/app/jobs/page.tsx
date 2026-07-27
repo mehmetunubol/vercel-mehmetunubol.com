@@ -1,4 +1,4 @@
-import { Button } from "@repo/ui";
+import { Badge, Card, CardContent, CardHeader, CardTitle } from "@repo/ui";
 import { desc, eq } from "drizzle-orm";
 import Link from "next/link";
 import { randomUUID } from "node:crypto";
@@ -12,6 +12,11 @@ import { db } from "@/lib/db";
 import { jobs, matches, profiles, searchPreferences, trackedBoards } from "@/lib/db/schema";
 import { upsertJobs } from "@/lib/jobs";
 import { jobMatchesPreferences } from "@/lib/preferences";
+import { AppShell } from "@/components/app-shell";
+import { SubmitButton } from "@/components/submit-button";
+
+const inputClass =
+  "w-full rounded-md border border-border bg-transparent px-2.5 py-1.5 text-sm transition-colors focus:border-accent focus:outline-none";
 
 async function addBoard(formData: FormData) {
   "use server";
@@ -48,6 +53,19 @@ async function syncBoard(formData: FormData) {
   await upsertJobs(normalized, board.id);
   await db.update(trackedBoards).set({ lastFetchedAt: new Date() }).where(eq(trackedBoards.id, board.id));
   await autoMatchNewJobsForUser(userId);
+  revalidatePath("/jobs");
+}
+
+async function setBoardActive(formData: FormData) {
+  "use server";
+  const userId = await requireUserId();
+  if (!userId) return;
+
+  const boardId = formData.get("boardId");
+  const active = formData.get("active") === "true";
+  if (typeof boardId !== "string") return;
+
+  await db.update(trackedBoards).set({ active }).where(eq(trackedBoards.id, boardId));
   revalidatePath("/jobs");
 }
 
@@ -115,148 +133,183 @@ export default async function JobsPage() {
     : [];
 
   return (
-    <main className="mx-auto max-w-3xl space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Jobs</h1>
-        <Link href="/preferences" className="text-sm text-accent underline">
-          Search preferences →
-        </Link>
-      </div>
-
-      {recommended.length > 0 && (
-        <section className="space-y-3 rounded-lg border border-border p-4">
-          <h2 className="text-sm font-medium">Recommended for you</h2>
-          <ul className="space-y-2">
-            {recommended.map(({ job, score }) => (
-              <li key={job.id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
-                <Link href={`/jobs/${job.id}`} className="hover:underline">
-                  {job.title} <span className="text-muted">— {job.company}</span>
-                </Link>
-                <span className="text-xs font-medium">{score}/100</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <section className="space-y-3 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-medium">Track a Greenhouse or Lever board</h2>
-        <form action={addBoard} className="flex flex-wrap gap-2">
-          <select name="source" className="rounded-md border border-border bg-transparent px-2 py-1 text-sm">
-            <option value="greenhouse">Greenhouse</option>
-            <option value="lever">Lever</option>
-          </select>
-          <input
-            name="boardToken"
-            placeholder="board token / site slug"
-            required
-            className="rounded-md border border-border bg-transparent px-2 py-1 text-sm"
-          />
-          <input
-            name="companyName"
-            placeholder="Company name"
-            required
-            className="rounded-md border border-border bg-transparent px-2 py-1 text-sm"
-          />
-          <Button type="submit" size="sm">
-            Track
-          </Button>
-        </form>
-
-        {boards.length > 0 && (
-          <ul className="space-y-2">
-            {boards.map((board) => (
-              <li key={board.id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
-                <span>
-                  {board.companyName} ({board.source}: {board.boardToken})
-                </span>
-                <form action={syncBoard}>
-                  <input type="hidden" name="boardId" value={board.id} />
-                  <Button type="submit" size="sm" variant="outline">
-                    Sync
-                  </Button>
-                </form>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="space-y-3 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-medium">Aggregators</h2>
-        <div className="flex gap-2">
-          <form action={syncAggregator}>
-            <input type="hidden" name="source" value="remoteok" />
-            <Button type="submit" size="sm" variant="outline">
-              Sync RemoteOK
-            </Button>
-          </form>
-          <form action={syncAggregator}>
-            <input type="hidden" name="source" value="arbeitnow" />
-            <Button type="submit" size="sm" variant="outline">
-              Sync Arbeitnow
-            </Button>
-          </form>
+    <AppShell>
+      <div className="space-y-8">
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight">Jobs</h1>
+            <p className="text-sm text-muted">Track boards, sync aggregators, or paste one in by hand.</p>
+          </div>
+          <Link href="/preferences" className="shrink-0 text-sm text-accent hover:underline">
+            Search preferences →
+          </Link>
         </div>
-      </section>
 
-      <section className="space-y-3 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-medium">Paste a job</h2>
-        <form action={pasteJob} className="space-y-2">
-          <input
-            name="title"
-            placeholder="Title"
-            required
-            className="w-full rounded-md border border-border bg-transparent px-2 py-1 text-sm"
-          />
-          <input
-            name="company"
-            placeholder="Company"
-            required
-            className="w-full rounded-md border border-border bg-transparent px-2 py-1 text-sm"
-          />
-          <input
-            name="url"
-            placeholder="URL (optional)"
-            className="w-full rounded-md border border-border bg-transparent px-2 py-1 text-sm"
-          />
-          <textarea
-            name="rawText"
-            placeholder="Paste job description"
-            required
-            rows={4}
-            className="w-full rounded-md border border-border bg-transparent px-2 py-1 text-sm"
-          />
-          <Button type="submit" size="sm">
-            Add job
-          </Button>
-        </form>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-sm font-medium">
-          Jobs ({filteredJobs.length}
-          {prefs ? ` of ${jobList.length}, filtered by preferences` : ""})
-        </h2>
-        {filteredJobs.length === 0 ? (
-          <p className="text-sm text-muted">
-            {prefs ? "No jobs match your search preferences yet." : "No jobs yet."}
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {filteredJobs.map((job) => (
-              <li key={job.id} className="rounded-md border border-border p-3 text-sm">
-                <Link href={`/jobs/${job.id}`} className="font-medium hover:underline">
-                  {job.title}
-                </Link>{" "}
-                <span className="text-muted">
-                  — {job.company} ({job.source})
-                </span>
-              </li>
-            ))}
-          </ul>
+        {recommended.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Recommended for you</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {recommended.map(({ job, score }) => (
+                <Link
+                  key={job.id}
+                  href={`/jobs/${job.id}`}
+                  className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm transition-colors hover:border-accent/40"
+                >
+                  <span className="min-w-0 truncate">
+                    {job.title} <span className="text-muted">— {job.company}</span>
+                  </span>
+                  <Badge variant={score >= 70 ? "accent" : "default"} className="shrink-0 tabular-nums">
+                    {score}/100
+                  </Badge>
+                </Link>
+              ))}
+            </CardContent>
+          </Card>
         )}
-      </section>
-    </main>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Track a Greenhouse or Lever board</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <form action={addBoard} className="flex flex-wrap gap-2">
+                <select name="source" className={`${inputClass} w-auto`}>
+                  <option value="greenhouse">Greenhouse</option>
+                  <option value="lever">Lever</option>
+                </select>
+                <input name="boardToken" placeholder="board token / site slug" required className={`${inputClass} flex-1`} />
+                <input name="companyName" placeholder="Company name" required className={`${inputClass} flex-1`} />
+                <SubmitButton size="sm" pendingText="Tracking…">
+                  Track
+                </SubmitButton>
+              </form>
+
+              {boards.length > 0 ? (
+                <ul className="space-y-2">
+                  {boards.map((board) => (
+                    <li
+                      key={board.id}
+                      className="flex items-center justify-between gap-2 rounded-md border border-border p-2 text-sm"
+                    >
+                      <span className="min-w-0 truncate">
+                        {board.companyName} <Badge variant="outline">{board.source}</Badge>{" "}
+                        {board.active ? (
+                          <Badge variant="accent">active</Badge>
+                        ) : (
+                          <Badge variant="default" className="text-muted">
+                            paused
+                          </Badge>
+                        )}
+                      </span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {board.active ? (
+                          <form action={syncBoard}>
+                            <input type="hidden" name="boardId" value={board.id} />
+                            <SubmitButton size="sm" variant="outline" pendingText="Syncing…">
+                              Sync
+                            </SubmitButton>
+                          </form>
+                        ) : null}
+                        <form action={setBoardActive}>
+                          <input type="hidden" name="boardId" value={board.id} />
+                          <input type="hidden" name="active" value={board.active ? "false" : "true"} />
+                          <SubmitButton
+                            size="sm"
+                            variant="ghost"
+                            pendingText={board.active ? "Untracking…" : "Retracking…"}
+                          >
+                            {board.active ? "Untrack" : "Retrack"}
+                          </SubmitButton>
+                        </form>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-muted">No boards tracked yet — add one above.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Aggregators</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-2">
+                <form action={syncAggregator}>
+                  <input type="hidden" name="source" value="remoteok" />
+                  <SubmitButton size="sm" variant="outline" pendingText="Syncing…">
+                    Sync RemoteOK
+                  </SubmitButton>
+                </form>
+                <form action={syncAggregator}>
+                  <input type="hidden" name="source" value="arbeitnow" />
+                  <SubmitButton size="sm" variant="outline" pendingText="Syncing…">
+                    Sync Arbeitnow
+                  </SubmitButton>
+                </form>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Paste a job</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form action={pasteJob} className="space-y-2">
+              <input name="title" placeholder="Title" required className={inputClass} />
+              <input name="company" placeholder="Company" required className={inputClass} />
+              <input name="url" placeholder="URL (optional)" className={inputClass} />
+              <textarea
+                name="rawText"
+                placeholder="Paste job description"
+                required
+                rows={4}
+                className={inputClass}
+              />
+              <SubmitButton size="sm" pendingText="Adding…">
+                Add job
+              </SubmitButton>
+            </form>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-3">
+          <h2 className="text-sm font-medium text-muted">
+            Jobs — {filteredJobs.length}
+            {prefs ? ` of ${jobList.length}, filtered by preferences` : ""}
+          </h2>
+          {filteredJobs.length === 0 ? (
+            <p className="text-sm text-muted">
+              {prefs ? "No jobs match your search preferences yet." : "No jobs yet."}
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {filteredJobs.map((job) => (
+                <li key={job.id}>
+                  <Link
+                    href={`/jobs/${job.id}`}
+                    className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm transition-colors hover:border-accent/40"
+                  >
+                    <span className="min-w-0 truncate font-medium">
+                      {job.title} <span className="font-normal text-muted">— {job.company}</span>
+                    </span>
+                    <Badge variant="outline" className="shrink-0">
+                      {job.source}
+                    </Badge>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </AppShell>
   );
 }

@@ -1,4 +1,5 @@
 import type { NormalizedJob } from "@/lib/jobs";
+import { htmlToPlainText } from "@/lib/html";
 
 interface GreenhouseJob {
   id: number;
@@ -25,7 +26,7 @@ export async function fetchGreenhouseJobs(boardToken: string, companyName: strin
     title: job.title,
     company: companyName,
     location: job.location?.name,
-    rawDescription: job.content ?? "",
+    rawDescription: htmlToPlainText(job.content ?? ""),
     postedAt: job.updated_at ? new Date(job.updated_at) : undefined,
   }));
 }
