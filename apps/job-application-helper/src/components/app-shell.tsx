@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Footer, Header, Shell, ThemeToggle } from "@repo/ui";
-import { auth, signOut } from "@/lib/auth";
+import { auth, isAdmin, signOut } from "@/lib/auth";
 import { NavLinks } from "@/components/nav-links";
 import { SubmitButton } from "@/components/submit-button";
 
@@ -12,6 +12,7 @@ async function logout() {
 
 export async function AppShell({ children }: { children: ReactNode }) {
   const session = await auth();
+  const admin = session?.user ? await isAdmin() : false;
 
   return (
     <Shell
@@ -25,7 +26,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
               <span className="font-semibold tracking-tight">job helper</span>
             </Link>
           }
-          nav={<NavLinks />}
+          nav={<NavLinks isAdmin={admin} />}
           actions={
             <div className="flex items-center gap-2">
               <ThemeToggle />

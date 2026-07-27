@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@repo/ui";
 
-const links = [
+const baseLinks = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/jobs", label: "Jobs" },
   { href: "/applications", label: "Applications" },
@@ -12,8 +12,9 @@ const links = [
   { href: "/profile", label: "Profile" },
 ];
 
-export function NavLinks() {
+export function NavLinks({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
+  const links = isAdmin ? [...baseLinks, { href: "/admin/users", label: "Admin" }] : baseLinks;
 
   return (
     <>

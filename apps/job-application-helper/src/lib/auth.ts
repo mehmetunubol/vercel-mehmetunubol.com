@@ -5,6 +5,11 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 
+// Only this username can manage other users (create/delete/reset password).
+// There's no roles table — this is a personal single-operator tool, so a
+// hardcoded check is simpler than modeling permissions for one admin.
+export const ADMIN_USERNAME = "unubol";
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
@@ -53,4 +58,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 export async function requireUserId(): Promise<string | null> {
   const session = await auth();
   return session?.user?.id ?? null;
+}
+
+export async function getCurrentUsername(): Promise<string | null> {
+  const userId = await requireUserId();
+  if (!userId) return null;
+
+  const [user] = await db.select({ username: users.username }).from(users).where(eq(users.id, userId)).limit(1);
+  return user?.username ?? null;
+}
+
+export async function isAdmin(): Promise<boolean> {
+  const username = await getCurrentUsername();
+  return username === ADMIN_USERNAME;
 }
