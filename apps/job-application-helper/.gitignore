@@ -1,0 +1,3 @@
+scripts/seed-users.local.json
+.vercel
+.env*

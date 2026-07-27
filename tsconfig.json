@@ -3,6 +3,7 @@
   "references": [
     { "path": "packages/config" },
     { "path": "packages/ui" },
-    { "path": "apps/web" }
+    { "path": "apps/web" },
+    { "path": "apps/job-application-helper" }
   ]
 }

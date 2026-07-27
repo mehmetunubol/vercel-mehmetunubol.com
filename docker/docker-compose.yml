@@ -26,6 +26,33 @@ services:
       # real volume instead, same reasoning as node_modules above.
       - web_next_cache:/workspace/apps/web/.next
 
+  job-application-helper:
+    image: node:22-bookworm-slim
+    working_dir: /workspace
+    command: >
+      sh -c "corepack enable &&
+             corepack prepare pnpm@10.15.1 --activate &&
+             pnpm install --frozen-lockfile=false &&
+             pnpm --filter job-application-helper exec next dev -p 3001 -H 0.0.0.0"
+    ports:
+      - "3001:3001"
+    environment:
+      - NEXT_TELEMETRY_DISABLED=1
+    env_file:
+      - ../apps/job-application-helper/.env.local
+    volumes:
+      - ..:/workspace
+      # Named volumes so the container's node_modules never touch the host's
+      # (host modules are built for macOS; the container is Linux).
+      - jah_root_node_modules:/workspace/node_modules
+      - jah_app_node_modules:/workspace/apps/job-application-helper/node_modules
+      - jah_ui_node_modules:/workspace/packages/ui/node_modules
+      - jah_config_node_modules:/workspace/packages/config/node_modules
+      # Turbopack's dev cache is flaky on Docker Desktop's bind-mount fs
+      # (intermittent "Failed to write app endpoint" panics) — keep it on a
+      # real volume instead, same reasoning as node_modules above.
+      - jah_next_cache:/workspace/apps/job-application-helper/.next
+
   yt-note-agent:
     build:
       context: ../../yt-note-agent
@@ -49,3 +76,8 @@ volumes:
   web_ui_node_modules:
   web_config_node_modules:
   web_next_cache:
+  jah_root_node_modules:
+  jah_app_node_modules:
+  jah_ui_node_modules:
+  jah_config_node_modules:
+  jah_next_cache:

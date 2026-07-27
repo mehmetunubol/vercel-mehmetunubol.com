@@ -1,0 +1,24 @@
+@import "tailwindcss";
+@import "@repo/config/tailwind";
+
+/* Compile Tailwind classes used by the shared UI package (JIT source). */
+@source "../../../../packages/ui/src";
+
+/* App brand: teal accent, distinct from apps/web's blue, per the
+   "apps are independent" convention (see repo README). */
+:root {
+  --color-accent: oklch(0.6 0.13 170);
+  --color-accent-foreground: oklch(0.98 0 0);
+}
+
+.dark {
+  --color-accent: oklch(0.72 0.12 170);
+  --color-accent-foreground: oklch(0.16 0.02 258);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+}
