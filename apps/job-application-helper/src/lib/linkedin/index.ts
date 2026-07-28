@@ -41,20 +41,23 @@ function delay(): Promise<void> {
 
 /**
  * Runs a saved LinkedIn search end to end: resolves/caches the geoId, pages
- * the guest search API, drops anything already tracked under another source
- * (by normalized company+title+location — LinkedIn ids never collide with
- * other sources' external ids so that check alone isn't enough), fetches a
- * description per new listing, and returns NormalizedJob rows ready for
- * `upsertJobs()`. Propagates RateLimitError/BlockedError instead of
- * swallowing them — a scheduled run must fail loudly, not report zero new
- * jobs forever.
+ * the guest search API — passing the saved search's own `lastRunAt` as the
+ * incremental-fetch cutoff (same pattern as Arbeitnow's `sinceMs`, only
+ * applied under "newest" sort) — drops anything already tracked under
+ * another source (by normalized company+title+location — LinkedIn ids never
+ * collide with other sources' external ids so that check alone isn't
+ * enough), fetches a description per new listing, and returns NormalizedJob
+ * rows ready for `upsertJobs()`. Propagates RateLimitError/BlockedError
+ * instead of swallowing them — a scheduled run must fail loudly, not report
+ * zero new jobs forever.
  */
 export async function runSavedSearch(savedSearch: SavedSearch): Promise<NormalizedJob[]> {
   const filters = await resolveFilters(savedSearch);
   const duplicateIndex = await buildDuplicateKeyIndex();
+  const sinceMs = savedSearch.lastRunAt?.getTime();
 
   const results: NormalizedJob[] = [];
-  for await (const page of pageSearch(filters)) {
+  for await (const page of pageSearch(filters, sinceMs)) {
     for (const card of page) {
       const key = normalizedJobKey(card.company, card.title, card.location);
       if (duplicateIndex.has(key)) continue;

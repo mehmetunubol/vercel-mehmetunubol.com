@@ -93,12 +93,25 @@ Implementation: `src/lib/linkedin/`.
   dropped before it's added, so it isn't duplicated. Same-source re-finds are
   already deduplicated by the `(source, external_id)` unique index via
   `upsertJobs()`.
+- Incremental re-runs: `runSavedSearch()` passes the saved search's own
+  `last_run_at` to `pageSearch()` as a `sinceMs` cutoff (same pattern as
+  Arbeitnow's `sinceMs`). Under the default "newest" sort, cards posted at or
+  before that cutoff are dropped and paging stops once a page's oldest card
+  is at or before it — so re-running the same saved search only fetches
+  postings newer than its last run instead of re-walking the same window
+  every time. A card with no parsed `postedAt` is always kept (treated as
+  fresh) rather than guessed at. Under "relevance" sort the cutoff is
+  ignored entirely, since result order isn't chronological there — every
+  page is fetched in full regardless of dates. Either way, anything already
+  in the `jobs` table is separately caught by `dedupe.ts`, so a re-run can
+  never insert the same posting twice even without the cutoff.
 - `index.ts`'s `runSavedSearch()` ties it together: resolves/caches the
-  geoId, pages results, drops cross-source duplicates, fetches a description
-  per new listing via `fetchJobDescription()` (also 2–5s delayed), and
-  returns `NormalizedJob[]` for `upsertJobs()`. It does not catch
-  `RateLimitError`/`BlockedError` — those propagate so a run fails loudly
-  instead of silently reporting zero new jobs.
+  geoId, pages results (with the cutoff above), drops cross-source
+  duplicates, fetches a description per new listing via
+  `fetchJobDescription()` (also 2–5s delayed), and returns `NormalizedJob[]`
+  for `upsertJobs()`. It does not catch `RateLimitError`/`BlockedError` —
+  those propagate so a run fails loudly instead of silently reporting zero
+  new jobs.
 - Discovered LinkedIn jobs land in the same `jobs` table as every other
   source, at the same pre-application state as any other newly discovered
   job — nothing about them is marked "applied" until you draft a cover

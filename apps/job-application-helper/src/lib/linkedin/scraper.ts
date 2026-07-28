@@ -51,8 +51,20 @@ export function assertNotBlocked(html: string, url: string, cards: ParsedJobCard
  * Pages through LinkedIn's guest job search until exhausted, rate-limited,
  * blocked, or the `start` cap is hit. Sequential requests only, with a
  * randomized 2-5s delay between pages.
+ *
+ * `sinceMs`, when given, drops cards posted at or before that cutoff and
+ * stops paging once a page's oldest card is at or before it — mirroring
+ * Arbeitnow's incremental-fetch cutoff. This only holds when results are
+ * ordered newest-first (`sort: "newest"`, the default); under "relevance"
+ * sort, posting date isn't monotonic across pages, so the cutoff is ignored
+ * and every page is paged/yielded in full. A card with no parsed `postedAt`
+ * is always treated as fresh — LinkedIn's guest markup doesn't always
+ * include a `time[datetime]`, and it's safer to over-fetch than to silently
+ * drop an undated job.
  */
-export async function* pageSearch(filters: LinkedInSearchFilters): AsyncGenerator<ParsedJobCard[]> {
+export async function* pageSearch(filters: LinkedInSearchFilters, sinceMs?: number): AsyncGenerator<ParsedJobCard[]> {
+  const useCutoff = sinceMs !== undefined && (filters.sort ?? "newest") === "newest";
+
   for (let start = 0; start < START_CAP; start += PAGE_SIZE) {
     const params = serializeFilters(filters, start);
     const url = `${SEARCH_URL}?${params.toString()}`;
@@ -61,7 +73,17 @@ export async function* pageSearch(filters: LinkedInSearchFilters): AsyncGenerato
     assertNotBlocked(html, url, cards);
 
     if (cards.length === 0) return;
-    yield cards;
+
+    if (useCutoff) {
+      const freshCards = cards.filter((card) => !card.postedAt || card.postedAt.getTime() > sinceMs);
+      if (freshCards.length > 0) yield freshCards;
+
+      const oldestInPage = cards.at(-1);
+      if (oldestInPage?.postedAt && oldestInPage.postedAt.getTime() <= sinceMs) return;
+    } else {
+      yield cards;
+    }
+
     if (cards.length < PAGE_SIZE) return;
 
     await sleep(randomDelayMs());
