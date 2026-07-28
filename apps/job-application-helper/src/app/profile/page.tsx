@@ -22,14 +22,21 @@ async function fetchFromWeb(_prevState: ActionResult | null, _formData: FormData
   let upstream: Response;
   try {
     upstream = await fetch(`${webUrl}/api/profile`, {
-      headers: { "x-profile-secret": secret },
+      headers: {
+        "x-profile-secret": secret,
+        "User-Agent": "job-application-helper (internal profile sync)",
+      },
       cache: "no-store",
     });
   } catch {
     return { ok: false, message: `Couldn't reach ${webUrl} — is apps/web running?` };
   }
   if (!upstream.ok) {
-    return { ok: false, message: `mehmetunubol.com returned ${upstream.status}.` };
+    const hint =
+      upstream.status === 403
+        ? " (likely Cloudflare blocking the server-to-server request, not our code — check Cloudflare's security events for mehmetunubol.com)"
+        : "";
+    return { ok: false, message: `mehmetunubol.com returned ${upstream.status}.${hint}` };
   }
   const data = await upstream.json();
 

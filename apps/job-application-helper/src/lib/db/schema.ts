@@ -66,6 +66,13 @@ export const searchPreferences = pgTable("search_preferences", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Tracks last-synced time for targets that aren't a tracked board (currently
+// just the two aggregators) — trackedBoards already has its own lastFetchedAt.
+export const syncStatus = pgTable("sync_status", {
+  id: text("id").primaryKey(),
+  lastSyncedAt: timestamp("last_synced_at").notNull(),
+});
+
 export const trackedBoards = pgTable("tracked_boards", {
   id: uuid("id").defaultRandom().primaryKey(),
   source: jobSourceEnum("source").notNull(),

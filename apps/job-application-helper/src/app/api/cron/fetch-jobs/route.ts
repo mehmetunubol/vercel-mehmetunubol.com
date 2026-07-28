@@ -5,8 +5,8 @@ import { fetchArbeitnowJobs, fetchRemoteOkJobs } from "@/lib/ats/aggregators";
 import { fetchGreenhouseJobs } from "@/lib/ats/greenhouse";
 import { fetchLeverJobs } from "@/lib/ats/lever";
 import { db } from "@/lib/db";
-import { searchPreferences, trackedBoards } from "@/lib/db/schema";
-import { upsertJobs } from "@/lib/jobs";
+import { searchPreferences, syncStatus, trackedBoards } from "@/lib/db/schema";
+import { recordSyncStatus, upsertJobs } from "@/lib/jobs";
 
 // Vercel Cron calls this with `Authorization: Bearer $CRON_SECRET` — see
 // vercel.json. Excluded from the auth proxy matcher (see src/proxy.ts).
@@ -32,9 +32,16 @@ export async function GET(request: Request) {
 
   const remoteOk = await upsertJobs(await fetchRemoteOkJobs());
   results.remoteok = remoteOk.processed;
+  await recordSyncStatus("aggregator:remoteok");
 
-  const arbeitnow = await upsertJobs(await fetchArbeitnowJobs());
+  const [arbeitnowStatus] = await db
+    .select()
+    .from(syncStatus)
+    .where(eq(syncStatus.id, "aggregator:arbeitnow"))
+    .limit(1);
+  const arbeitnow = await upsertJobs(await fetchArbeitnowJobs(arbeitnowStatus?.lastSyncedAt.getTime()));
   results.arbeitnow = arbeitnow.processed;
+  await recordSyncStatus("aggregator:arbeitnow");
 
   const usersWithPrefs = await db.select({ userId: searchPreferences.userId }).from(searchPreferences);
   const autoMatchResults: Record<string, unknown> = {};

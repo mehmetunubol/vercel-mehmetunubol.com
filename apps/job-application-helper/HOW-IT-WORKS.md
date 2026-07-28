@@ -1,5 +1,8 @@
 # How job tracking works
 
+> Keep this doc in sync: whenever tracking, filtering, or auto-match behavior
+> changes, update the relevant section here in the same change.
+
 Short version: **nothing runs automatically unless it's deployed to production.**
 Locally, every sync is a button you click. In production, one daily cron job
 clicks those same buttons for you.
@@ -11,6 +14,13 @@ clicks those same buttons for you.
    pull every open posting from that one company.
 2. **Aggregators** (RemoteOK / Arbeitnow) — broad feeds, no company-specific
    setup. Syncing pulls whatever is currently listed across many companies.
+   RemoteOK returns its full current listing each sync (~100 jobs, no
+   pagination). Arbeitnow paginates (~175 jobs/page); `fetchArbeitnowJobs()`
+   follows `links.next` up to 10 pages, optionally stopping once results are
+   older than a `sinceMs` cutoff (results are ordered newest-first). Both the
+   manual Sync button and the daily cron pass the stored `lastSyncedAt` for
+   `aggregator:arbeitnow` (`sync_status` table) as that cutoff, so only jobs
+   posted since the last sync are fetched.
 3. **Paste a job** — you paste in a posting by hand (for job boards with no
    API, or a one-off you found on LinkedIn).
 
@@ -31,8 +41,10 @@ Go to `/jobs` → "Track a Greenhouse or Lever board":
     embed the board directly).
 - **Company name** — just a label for the UI, doesn't affect fetching.
 
-Once added, it shows up in the tracked list with a **Sync** button. Clicking
-Sync fetches that board's current postings right now.
+Once added, it shows up in the tracked list with a **Sync** button, plus an
+**Untrack** button. Untracking sets the board to paused (`active = false`) —
+it stops showing up for Sync and the daily cron skips it, but its jobs stay in
+the database. Hit **Retrack** to resume it.
 
 ## What "automatic" actually means
 
@@ -66,6 +78,14 @@ everything that's already in the database:
 No preferences configured yet → nothing is filtered, and no auto-match runs
 either (see below) — configure it once on `/preferences` to turn both on.
 
+The filter runs as a SQL `WHERE` clause (`preferenceWhereClause()` in
+`src/lib/preferences.ts`), applied **before** the "50 most recent" limit on
+`/jobs` and before the auto-match candidate limit — not as a JS `.filter()`
+after truncating to a page of recent rows. That matters: filtering after a
+limit would silently miss a matching job that's older than the 50 most
+recent postings. If this ever gets rewritten, keep the filter ahead of any
+`LIMIT`.
+
 ## Auto-match against your CV
 
 Whenever a sync happens (board, aggregator, paste, or the daily cron), the
@@ -82,6 +102,19 @@ through the backlog a batch at a time.
 
 Scored jobs appear in the **"Recommended for you"** section at the top of
 `/jobs`, sorted by score.
+
+## Automatic cleanup
+
+A second daily cron (`/api/cron/cleanup-jobs`, `0 8 * * *`, an hour after the
+fetch cron) deletes jobs that are:
+
+- older than **7 days** (by `discoveredAt`), **and**
+- never scored (no `matches` row), **and**
+- never carried into an application (no `applications` row).
+
+Anything matched or applied-to is kept regardless of age — this only clears
+out stale, untouched postings so the `jobs` table doesn't grow forever. Same
+`CRON_SECRET` protection as the fetch cron.
 
 ## Everyday flow
 

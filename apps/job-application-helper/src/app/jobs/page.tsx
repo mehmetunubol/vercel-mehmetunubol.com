@@ -9,9 +9,9 @@ import { fetchGreenhouseJobs } from "@/lib/ats/greenhouse";
 import { fetchLeverJobs } from "@/lib/ats/lever";
 import { requireUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { jobs, matches, profiles, searchPreferences, trackedBoards } from "@/lib/db/schema";
-import { upsertJobs } from "@/lib/jobs";
-import { jobMatchesPreferences } from "@/lib/preferences";
+import { jobs, matches, profiles, searchPreferences, syncStatus, trackedBoards } from "@/lib/db/schema";
+import { recordSyncStatus, upsertJobs } from "@/lib/jobs";
+import { preferenceWhereClause } from "@/lib/preferences";
 import { AppShell } from "@/components/app-shell";
 import { SubmitButton } from "@/components/submit-button";
 
@@ -54,6 +54,7 @@ async function syncBoard(formData: FormData) {
   await db.update(trackedBoards).set({ lastFetchedAt: new Date() }).where(eq(trackedBoards.id, board.id));
   await autoMatchNewJobsForUser(userId);
   revalidatePath("/jobs");
+  revalidatePath("/dashboard");
 }
 
 async function setBoardActive(formData: FormData) {
@@ -77,10 +78,18 @@ async function syncAggregator(formData: FormData) {
   const source = formData.get("source");
   if (source !== "remoteok" && source !== "arbeitnow") return;
 
-  const normalized = source === "remoteok" ? await fetchRemoteOkJobs() : await fetchArbeitnowJobs();
+  let normalized;
+  if (source === "remoteok") {
+    normalized = await fetchRemoteOkJobs();
+  } else {
+    const [status] = await db.select().from(syncStatus).where(eq(syncStatus.id, "aggregator:arbeitnow")).limit(1);
+    normalized = await fetchArbeitnowJobs(status?.lastSyncedAt.getTime());
+  }
   await upsertJobs(normalized);
+  await recordSyncStatus(`aggregator:${source}`);
   await autoMatchNewJobsForUser(userId);
   revalidatePath("/jobs");
+  revalidatePath("/dashboard");
 }
 
 async function pasteJob(formData: FormData) {
@@ -112,12 +121,21 @@ async function pasteJob(formData: FormData) {
 export default async function JobsPage() {
   const userId = await requireUserId();
   const boards = await db.select().from(trackedBoards).orderBy(desc(trackedBoards.createdAt));
-  const jobList = await db.select().from(jobs).orderBy(desc(jobs.discoveredAt)).limit(50);
 
   const [prefs] = userId
     ? await db.select().from(searchPreferences).where(eq(searchPreferences.userId, userId)).limit(1)
     : [];
-  const filteredJobs = prefs ? jobList.filter((job) => jobMatchesPreferences(job, prefs)) : jobList;
+
+  // Filter in SQL before LIMIT — filtering in JS after truncating to a page
+  // of recent rows would silently miss matches outside that page.
+  const whereClause = prefs ? preferenceWhereClause(prefs) : undefined;
+  const filteredJobs = await db
+    .select()
+    .from(jobs)
+    .where(whereClause)
+    .orderBy(desc(jobs.discoveredAt))
+    .limit(50);
+  const totalJobCount = (await db.select({ id: jobs.id }).from(jobs)).length;
 
   const [latestProfile] = userId
     ? await db.select().from(profiles).where(eq(profiles.userId, userId)).orderBy(desc(profiles.createdAt)).limit(1)
@@ -282,8 +300,9 @@ export default async function JobsPage() {
 
         <div className="space-y-3">
           <h2 className="text-sm font-medium text-muted">
-            Jobs — {filteredJobs.length}
-            {prefs ? ` of ${jobList.length}, filtered by preferences` : ""}
+            {prefs
+              ? `Jobs matching preferences — ${filteredJobs.length} (of ${totalJobCount} tracked, showing up to 50)`
+              : `Jobs — ${filteredJobs.length} (of ${totalJobCount} tracked, showing up to 50)`}
           </h2>
           {filteredJobs.length === 0 ? (
             <p className="text-sm text-muted">

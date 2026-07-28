@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { jobs, type jobSourceEnum } from "@/lib/db/schema";
+import { jobs, syncStatus, type jobSourceEnum } from "@/lib/db/schema";
 
 export interface NormalizedJob {
   source: (typeof jobSourceEnum.enumValues)[number];
@@ -38,4 +38,12 @@ export async function upsertJobs(normalized: NormalizedJob[], trackedBoardId?: s
   }
 
   return { processed: normalized.length };
+}
+
+/** Records when an aggregator (or any non-tracked-board target) last synced. */
+export async function recordSyncStatus(id: string) {
+  await db
+    .insert(syncStatus)
+    .values({ id, lastSyncedAt: new Date() })
+    .onConflictDoUpdate({ target: syncStatus.id, set: { lastSyncedAt: new Date() } });
 }

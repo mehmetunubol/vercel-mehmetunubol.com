@@ -1,11 +1,10 @@
-import { desc, eq, notInArray } from "drizzle-orm";
+import { and, desc, eq, notInArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { jobs, matches, profiles, searchPreferences } from "@/lib/db/schema";
-import { jobMatchesPreferences } from "@/lib/preferences";
+import { preferenceWhereClause } from "@/lib/preferences";
 import { matchJobToProfile } from "@/lib/matching";
 import { profileDataSchema } from "@/lib/profile-schema";
 
-const CANDIDATE_POOL_SIZE = 50;
 const MAX_AUTO_MATCHES_PER_RUN = 8;
 
 export async function autoMatchNewJobsForUser(userId: string) {
@@ -32,16 +31,19 @@ export async function autoMatchNewJobsForUser(userId: string) {
     .where(eq(matches.profileId, profile.id));
   const matchedJobIds = alreadyMatched.map((row) => row.jobId);
 
-  const recentJobs = await db
+  // Filter in SQL (preferences + not-already-matched) before LIMIT, so a
+  // matching job further back in discovery order isn't skipped just because
+  // a smaller unfiltered page was taken first.
+  const conditions = [preferenceWhereClause(prefs), matchedJobIds.length > 0 ? notInArray(jobs.id, matchedJobIds) : undefined].filter(
+    (condition): condition is NonNullable<typeof condition> => condition !== undefined,
+  );
+
+  const candidates = await db
     .select()
     .from(jobs)
-    .where(matchedJobIds.length > 0 ? notInArray(jobs.id, matchedJobIds) : undefined)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(jobs.discoveredAt))
-    .limit(CANDIDATE_POOL_SIZE);
-
-  const candidates = recentJobs
-    .filter((job) => jobMatchesPreferences(job, prefs))
-    .slice(0, MAX_AUTO_MATCHES_PER_RUN);
+    .limit(MAX_AUTO_MATCHES_PER_RUN);
 
   let matched = 0;
   for (const job of candidates) {
