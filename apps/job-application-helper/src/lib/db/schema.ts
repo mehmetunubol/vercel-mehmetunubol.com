@@ -74,6 +74,13 @@ export const syncStatus = pgTable("sync_status", {
   lastSyncedAt: timestamp("last_synced_at").notNull(),
 });
 
+// Per-aggregator toggle for whether the daily cron includes it. Manual Sync
+// buttons ignore this — it only gates the automatic cron run.
+export const aggregatorSettings = pgTable("aggregator_settings", {
+  id: text("id").primaryKey(),
+  autoSyncEnabled: boolean("auto_sync_enabled").default(true).notNull(),
+});
+
 export const linkedinSavedSearches = pgTable("linkedin_saved_searches", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id")
@@ -104,6 +111,9 @@ export const trackedBoards = pgTable("tracked_boards", {
   boardToken: varchar("board_token", { length: 128 }).notNull(),
   companyName: varchar("company_name", { length: 128 }).notNull(),
   active: boolean("active").default(true).notNull(),
+  // Independent from `active`: a board can stay tracked (manual Sync still
+  // works) while being excluded from the daily cron run.
+  autoSyncEnabled: boolean("auto_sync_enabled").default(true).notNull(),
   lastFetchedAt: timestamp("last_fetched_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

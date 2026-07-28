@@ -1,5 +1,5 @@
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@repo/ui";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, not, notExists, or, sql } from "drizzle-orm";
 import Link from "next/link";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -10,7 +10,10 @@ import { fetchLeverJobs } from "@/lib/ats/lever";
 import { requireUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
+  aggregatorSettings,
+  applications,
   jobs,
+  jobSourceEnum,
   linkedinSavedSearches,
   matches,
   profiles,
@@ -77,6 +80,67 @@ async function setBoardActive(formData: FormData) {
   if (typeof boardId !== "string") return;
 
   await db.update(trackedBoards).set({ active }).where(eq(trackedBoards.id, boardId));
+  revalidatePath("/jobs");
+}
+
+async function deleteBoard(formData: FormData) {
+  "use server";
+  const userId = await requireUserId();
+  if (!userId) return;
+
+  const boardId = formData.get("boardId");
+  if (typeof boardId !== "string") return;
+
+  const [board] = await db.select().from(trackedBoards).where(eq(trackedBoards.id, boardId)).limit(1);
+  if (!board || board.active) return; // only untracked (paused) boards can be deleted
+
+  // trackedBoardId has no ON DELETE behavior — detach its jobs first so the
+  // board row can be removed; the jobs themselves stay.
+  await db.update(jobs).set({ trackedBoardId: null }).where(eq(jobs.trackedBoardId, boardId));
+  await db.delete(trackedBoards).where(eq(trackedBoards.id, boardId));
+  revalidatePath("/jobs");
+  revalidatePath("/dashboard");
+}
+
+async function toggleBoardAutoSync(formData: FormData) {
+  "use server";
+  const userId = await requireUserId();
+  if (!userId) return;
+
+  const boardId = formData.get("boardId");
+  const autoSyncEnabled = formData.get("autoSyncEnabled") === "true";
+  if (typeof boardId !== "string") return;
+
+  await db.update(trackedBoards).set({ autoSyncEnabled }).where(eq(trackedBoards.id, boardId));
+  revalidatePath("/jobs");
+}
+
+async function toggleAggregatorAutoSync(formData: FormData) {
+  "use server";
+  const userId = await requireUserId();
+  if (!userId) return;
+
+  const id = formData.get("id");
+  const autoSyncEnabled = formData.get("autoSyncEnabled") === "true";
+  if (typeof id !== "string") return;
+
+  await db
+    .insert(aggregatorSettings)
+    .values({ id, autoSyncEnabled })
+    .onConflictDoUpdate({ target: aggregatorSettings.id, set: { autoSyncEnabled } });
+  revalidatePath("/jobs");
+}
+
+async function toggleSavedSearchAutoSync(formData: FormData) {
+  "use server";
+  const userId = await requireUserId();
+  if (!userId) return;
+
+  const searchId = formData.get("searchId");
+  const active = formData.get("active") === "true";
+  if (typeof searchId !== "string") return;
+
+  await db.update(linkedinSavedSearches).set({ active }).where(eq(linkedinSavedSearches.id, searchId));
   revalidatePath("/jobs");
 }
 
@@ -196,13 +260,60 @@ async function deleteSavedSearch(formData: FormData) {
   revalidatePath("/jobs");
 }
 
-export default async function JobsPage() {
+const PAGE_SIZE = 50;
+
+/** A job with an existing applications row is never bulk-deleted — it's being tracked. */
+const notTrackedClause = notExists(db.select().from(applications).where(eq(applications.jobId, jobs.id)));
+
+async function discardSelectedJobs(formData: FormData) {
+  "use server";
   const userId = await requireUserId();
+  if (!userId) return;
+
+  const jobIds = formData.getAll("jobIds").filter((value): value is string => typeof value === "string");
+  if (jobIds.length === 0) return;
+
+  await db.delete(jobs).where(and(inArray(jobs.id, jobIds), notTrackedClause));
+  revalidatePath("/jobs");
+  revalidatePath("/dashboard");
+}
+
+async function clearUnmatchedJobs() {
+  "use server";
+  const userId = await requireUserId();
+  if (!userId) return;
+
+  const [prefs] = await db.select().from(searchPreferences).where(eq(searchPreferences.userId, userId)).limit(1);
+  const whereClause = prefs ? preferenceWhereClause(prefs) : undefined;
+  if (!whereClause) return; // no preferences configured — "not filtered" would mean "everything"
+
+  await db.delete(jobs).where(and(not(whereClause), notTrackedClause));
+  revalidatePath("/jobs");
+  revalidatePath("/dashboard");
+}
+
+const SOURCE_OPTIONS = jobSourceEnum.enumValues;
+
+export default async function JobsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; q?: string; source?: string }>;
+}) {
+  const userId = await requireUserId();
+  const { page: pageParam, q, source } = await searchParams;
+  const page = Math.max(1, Number(pageParam) || 1);
+  const sourceFilter = SOURCE_OPTIONS.includes(source as (typeof SOURCE_OPTIONS)[number])
+    ? (source as (typeof SOURCE_OPTIONS)[number])
+    : undefined;
+
   const boards = await db.select().from(trackedBoards).orderBy(desc(trackedBoards.createdAt));
   const savedSearches = await db
     .select()
     .from(linkedinSavedSearches)
     .orderBy(desc(linkedinSavedSearches.createdAt));
+  const aggregatorSettingsRows = await db.select().from(aggregatorSettings);
+  const aggregatorAutoSync = new Map(aggregatorSettingsRows.map((row) => [row.id, row.autoSyncEnabled]));
+  const isAggregatorAutoSyncOn = (id: string) => aggregatorAutoSync.get(id) ?? true;
 
   const [prefs] = userId
     ? await db.select().from(searchPreferences).where(eq(searchPreferences.userId, userId)).limit(1)
@@ -210,14 +321,30 @@ export default async function JobsPage() {
 
   // Filter in SQL before LIMIT — filtering in JS after truncating to a page
   // of recent rows would silently miss matches outside that page.
-  const whereClause = prefs ? preferenceWhereClause(prefs) : undefined;
+  const prefsClause = prefs ? preferenceWhereClause(prefs) : undefined;
+  const extraClauses = [
+    q ? or(ilike(jobs.title, `%${q}%`), ilike(jobs.company, `%${q}%`), ilike(jobs.rawDescription, `%${q}%`)) : undefined,
+    sourceFilter ? eq(jobs.source, sourceFilter) : undefined,
+  ].filter((clause): clause is NonNullable<typeof clause> => clause !== undefined);
+  const whereClause =
+    prefsClause && extraClauses.length > 0
+      ? and(prefsClause, ...extraClauses)
+      : extraClauses.length > 0
+        ? and(...extraClauses)
+        : prefsClause;
+  const countRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(jobs)
+    .where(whereClause);
+  const filteredCount = countRows[0]?.count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
   const filteredJobs = await db
     .select()
     .from(jobs)
     .where(whereClause)
     .orderBy(desc(jobs.discoveredAt))
-    .limit(50);
-  const totalJobCount = (await db.select({ id: jobs.id }).from(jobs)).length;
+    .limit(PAGE_SIZE)
+    .offset((page - 1) * PAGE_SIZE);
 
   const [latestProfile] = userId
     ? await db.select().from(profiles).where(eq(profiles.userId, userId)).orderBy(desc(profiles.createdAt)).limit(1)
@@ -231,6 +358,14 @@ export default async function JobsPage() {
         .orderBy(desc(matches.score))
         .limit(10)
     : [];
+
+  const pageHref = (targetPage: number) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (sourceFilter) params.set("source", sourceFilter);
+    params.set("page", String(targetPage));
+    return `/jobs?${params.toString()}`;
+  };
 
   return (
     <AppShell>
@@ -302,7 +437,12 @@ export default async function JobsPage() {
                           <Badge variant="default" className="text-muted">
                             paused
                           </Badge>
-                        )}
+                        )}{" "}
+                        {board.active && !board.autoSyncEnabled ? (
+                          <Badge variant="default" className="text-muted">
+                            auto-sync off
+                          </Badge>
+                        ) : null}
                       </span>
                       <div className="flex shrink-0 items-center gap-2">
                         {board.active ? (
@@ -310,6 +450,15 @@ export default async function JobsPage() {
                             <input type="hidden" name="boardId" value={board.id} />
                             <SubmitButton size="sm" variant="outline" pendingText="Syncing…">
                               Sync
+                            </SubmitButton>
+                          </form>
+                        ) : null}
+                        {board.active ? (
+                          <form action={toggleBoardAutoSync}>
+                            <input type="hidden" name="boardId" value={board.id} />
+                            <input type="hidden" name="autoSyncEnabled" value={board.autoSyncEnabled ? "false" : "true"} />
+                            <SubmitButton size="sm" variant="ghost" pendingText="…">
+                              {board.autoSyncEnabled ? "Disable auto-sync" : "Enable auto-sync"}
                             </SubmitButton>
                           </form>
                         ) : null}
@@ -324,6 +473,14 @@ export default async function JobsPage() {
                             {board.active ? "Untrack" : "Retrack"}
                           </SubmitButton>
                         </form>
+                        {!board.active ? (
+                          <form action={deleteBoard}>
+                            <input type="hidden" name="boardId" value={board.id} />
+                            <SubmitButton size="sm" variant="ghost" pendingText="Deleting…">
+                              Delete
+                            </SubmitButton>
+                          </form>
+                        ) : null}
                       </div>
                     </li>
                   ))}
@@ -338,21 +495,32 @@ export default async function JobsPage() {
             <CardHeader>
               <CardTitle className="text-base">Aggregators</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                <form action={syncAggregator}>
-                  <input type="hidden" name="source" value="remoteok" />
-                  <SubmitButton size="sm" variant="outline" pendingText="Syncing…">
-                    Sync RemoteOK
-                  </SubmitButton>
-                </form>
-                <form action={syncAggregator}>
-                  <input type="hidden" name="source" value="arbeitnow" />
-                  <SubmitButton size="sm" variant="outline" pendingText="Syncing…">
-                    Sync Arbeitnow
-                  </SubmitButton>
-                </form>
-              </div>
+            <CardContent className="space-y-2">
+              {(["remoteok", "arbeitnow"] as const).map((id) => (
+                <div key={id} className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm capitalize">
+                    {id}{" "}
+                    {!isAggregatorAutoSyncOn(id) ? (
+                      <Badge variant="default" className="text-muted">
+                        auto-sync off
+                      </Badge>
+                    ) : null}
+                  </span>
+                  <form action={syncAggregator}>
+                    <input type="hidden" name="source" value={id} />
+                    <SubmitButton size="sm" variant="outline" pendingText="Syncing…">
+                      Sync
+                    </SubmitButton>
+                  </form>
+                  <form action={toggleAggregatorAutoSync}>
+                    <input type="hidden" name="id" value={id} />
+                    <input type="hidden" name="autoSyncEnabled" value={isAggregatorAutoSyncOn(id) ? "false" : "true"} />
+                    <SubmitButton size="sm" variant="ghost" pendingText="…">
+                      {isAggregatorAutoSyncOn(id) ? "Disable auto-sync" : "Enable auto-sync"}
+                    </SubmitButton>
+                  </form>
+                </div>
+              ))}
             </CardContent>
           </Card>
         </div>
@@ -417,13 +585,25 @@ export default async function JobsPage() {
                       <span className="text-xs text-muted">
                         {search.keywords || "any keywords"}
                         {search.location ? ` · ${search.location}` : ""}
-                      </span>
+                      </span>{" "}
+                      {!search.active ? (
+                        <Badge variant="default" className="text-muted">
+                          auto-sync off
+                        </Badge>
+                      ) : null}
                     </span>
                     <div className="flex shrink-0 items-center gap-2">
                       <form action={runSavedSearchAction}>
                         <input type="hidden" name="searchId" value={search.id} />
                         <SubmitButton size="sm" variant="outline" pendingText="Running…">
                           Run
+                        </SubmitButton>
+                      </form>
+                      <form action={toggleSavedSearchAutoSync}>
+                        <input type="hidden" name="searchId" value={search.id} />
+                        <input type="hidden" name="active" value={search.active ? "false" : "true"} />
+                        <SubmitButton size="sm" variant="ghost" pendingText="…">
+                          {search.active ? "Disable auto-sync" : "Enable auto-sync"}
                         </SubmitButton>
                       </form>
                       <form action={deleteSavedSearch}>
@@ -466,34 +646,97 @@ export default async function JobsPage() {
         </Card>
 
         <div className="space-y-3">
-          <h2 className="text-sm font-medium text-muted">
-            {prefs
-              ? `Jobs matching preferences — ${filteredJobs.length} (of ${totalJobCount} tracked, showing up to 50)`
-              : `Jobs — ${filteredJobs.length} (of ${totalJobCount} tracked, showing up to 50)`}
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-medium text-muted">
+              {prefs
+                ? `Jobs matching preferences — ${filteredCount} total, showing ${filteredJobs.length} (page ${page} of ${totalPages})`
+                : `Jobs — ${filteredCount} total, showing ${filteredJobs.length} (page ${page} of ${totalPages})`}
+            </h2>
+            {prefs ? (
+              <form action={clearUnmatchedJobs}>
+                <SubmitButton size="sm" variant="ghost" className="text-red-500" pendingText="Clearing…">
+                  Clear all non-matching jobs
+                </SubmitButton>
+              </form>
+            ) : null}
+          </div>
+
+          <form className="flex flex-wrap gap-2" action="/jobs">
+            <input
+              name="q"
+              defaultValue={q ?? ""}
+              placeholder="Search title, company, description…"
+              className={`${inputClass} flex-1`}
+            />
+            <select name="source" defaultValue={sourceFilter ?? ""} className={`${inputClass} w-auto`}>
+              <option value="">Any platform</option>
+              {SOURCE_OPTIONS.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+            <SubmitButton size="sm" variant="outline" pendingText="Filtering…">
+              Filter
+            </SubmitButton>
+            {q || sourceFilter ? (
+              <Link href="/jobs" className="inline-flex items-center text-sm text-accent hover:underline">
+                Clear filters
+              </Link>
+            ) : null}
+          </form>
+
           {filteredJobs.length === 0 ? (
             <p className="text-sm text-muted">
               {prefs ? "No jobs match your search preferences yet." : "No jobs yet."}
             </p>
           ) : (
-            <ul className="space-y-2">
-              {filteredJobs.map((job) => (
-                <li key={job.id}>
-                  <Link
-                    href={`/jobs/${job.id}`}
-                    className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm transition-colors hover:border-accent/40"
+            <form action={discardSelectedJobs} className="space-y-2">
+              <ul className="space-y-2">
+                {filteredJobs.map((job) => (
+                  <li
+                    key={job.id}
+                    className="flex items-center gap-2 rounded-md border border-border p-3 text-sm transition-colors hover:border-accent/40"
                   >
-                    <span className="min-w-0 truncate font-medium">
-                      {job.title} <span className="font-normal text-muted">— {job.company}</span>
-                    </span>
-                    <Badge variant="outline" className="shrink-0">
-                      {job.source}
-                    </Badge>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+                    <input type="checkbox" name="jobIds" value={job.id} className="shrink-0" />
+                    <Link href={`/jobs/${job.id}`} className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                      <span className="min-w-0 truncate font-medium">
+                        {job.title} <span className="font-normal text-muted">— {job.company}</span>
+                      </span>
+                      <Badge variant="outline" className="shrink-0">
+                        {job.source}
+                      </Badge>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              <SubmitButton size="sm" variant="outline" className="text-red-500" pendingText="Discarding…">
+                Discard selected
+              </SubmitButton>
+            </form>
           )}
+
+          {totalPages > 1 ? (
+            <div className="flex items-center justify-center gap-2 pt-2 text-sm">
+              {page > 1 ? (
+                <Link href={pageHref(page - 1)} className="text-accent hover:underline">
+                  ← Prev
+                </Link>
+              ) : (
+                <span className="text-muted">← Prev</span>
+              )}
+              <span className="text-muted">
+                {page} / {totalPages}
+              </span>
+              {page < totalPages ? (
+                <Link href={pageHref(page + 1)} className="text-accent hover:underline">
+                  Next →
+                </Link>
+              ) : (
+                <span className="text-muted">Next →</span>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
     </AppShell>

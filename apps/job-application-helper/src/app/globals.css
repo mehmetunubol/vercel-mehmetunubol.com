@@ -38,3 +38,51 @@
   }
 }
 
+/* Global "something is syncing" indicator — driven entirely by the
+   aria-busy attribute SubmitButton already sets while its form action is
+   pending, so any form submit (Sync, Run, Discard, ...) surfaces it without
+   extra JS/state wiring. */
+body:has(button[aria-busy="true"]) {
+  cursor: progress;
+}
+
+body:has(button[aria-busy="true"])::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: color-mix(in oklch, var(--color-background) 40%, transparent);
+  pointer-events: none;
+}
+
+body:has(button[aria-busy="true"])::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 40%;
+  z-index: 61;
+  background: var(--color-accent);
+  animation: sync-progress-bar 1.1s ease-in-out infinite;
+}
+
+@keyframes sync-progress-bar {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(150%);
+  }
+  100% {
+    transform: translateX(150%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body:has(button[aria-busy="true"])::after {
+    animation: none;
+    width: 100%;
+  }
+}
+

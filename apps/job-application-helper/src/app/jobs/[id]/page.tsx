@@ -1,5 +1,5 @@
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@repo/ui";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUserId } from "@/lib/auth";
@@ -75,6 +75,42 @@ async function draftCoverLetter(
   return { ok: true };
 }
 
+async function trackApplication(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  "use server";
+  const userId = await requireUserId();
+  if (!userId) return { ok: false, message: "Not signed in." };
+
+  const jobId = formData.get("jobId");
+  const profileId = formData.get("profileId");
+  if (typeof jobId !== "string" || typeof profileId !== "string") {
+    return { ok: false, message: "Missing job or profile." };
+  }
+
+  const [existing] = await db.select().from(applications).where(eq(applications.jobId, jobId)).limit(1);
+  if (existing) return { ok: true };
+
+  const [latestMatch] = await db
+    .select()
+    .from(matches)
+    .where(and(eq(matches.jobId, jobId), eq(matches.profileId, profileId)))
+    .orderBy(desc(matches.createdAt))
+    .limit(1);
+
+  await db.insert(applications).values({
+    userId,
+    jobId,
+    profileId,
+    matchId: latestMatch?.id,
+    status: latestMatch ? "matched" : "discovered",
+  });
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath("/applications");
+  return { ok: true };
+}
+
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [job] = await db.select().from(jobs).where(eq(jobs.id, id)).limit(1);
@@ -124,7 +160,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             <ActionForm
               action={runMatch}
               hiddenFields={{ jobId: job.id, profileId: latestProfile.id }}
-              submitLabel="Match against profile"
+              submitLabel={latestMatch ? "Re-run match" : "Match against profile"}
               pendingText="Scoring…"
               size="sm"
             />
@@ -136,6 +172,20 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               size="sm"
               variant="outline"
             />
+            {!application ? (
+              <ActionForm
+                action={trackApplication}
+                hiddenFields={{ jobId: job.id, profileId: latestProfile.id }}
+                submitLabel="Track in applications"
+                pendingText="Adding…"
+                size="sm"
+                variant="outline"
+              />
+            ) : (
+              <Badge variant="accent" className="self-center">
+                Tracked — {application.status}
+              </Badge>
+            )}
           </div>
         ) : (
           <p className="text-sm text-muted">No profile yet — visit Profile to fetch or upload one first.</p>

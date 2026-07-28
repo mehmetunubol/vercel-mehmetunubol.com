@@ -45,7 +45,9 @@ Go to `/jobs` → "Track a Greenhouse or Lever board":
 Once added, it shows up in the tracked list with a **Sync** button, plus an
 **Untrack** button. Untracking sets the board to paused (`active = false`) —
 it stops showing up for Sync and the daily cron skips it, but its jobs stay in
-the database. Hit **Retrack** to resume it.
+the database. Hit **Retrack** to resume it, or **Delete** (only shown while
+paused) to remove the board itself — its jobs stay in the database, just
+detached from the board.
 
 ## LinkedIn saved searches
 
@@ -116,15 +118,29 @@ choice at any larger scale.
   fresh postings.
 - **In production (Vercel)**: `vercel.json` defines a daily cron
   (`0 7 * * *`, once a day — Vercel's Hobby plan caps cron frequency) that
-  hits `/api/cron/fetch-jobs`. That route re-syncs **every active tracked
-  board**, **both aggregators**, and **every active LinkedIn saved search**,
-  in sequence, no user interaction needed. It's protected by a `CRON_SECRET`
+  hits `/api/cron/fetch-jobs`. That route re-syncs every tracked board,
+  aggregator, and LinkedIn saved search that has **auto-sync enabled**, in
+  sequence, no user interaction needed. It's protected by a `CRON_SECRET`
   bearer token so only Vercel's scheduler can trigger it. A saved search that
   throws (rate-limited or blocked) is caught and logged per-search so it
   doesn't stop the rest of that cron run.
 
-So: add a board once, and in production it keeps itself fresh daily. Locally,
-sync it yourself when you want to check.
+Auto-sync is a separate switch from whether something is tracked/manually
+runnable at all:
+
+- **Boards**: **Untrack** disables both manual Sync and the cron for that
+  board. While tracked, **Disable auto-sync** / **Enable auto-sync** controls
+  only whether the cron includes it — manual Sync keeps working either way.
+- **Aggregators**: each of RemoteOK/Arbeitnow has its own **Disable
+  auto-sync** / **Enable auto-sync** toggle (`aggregator_settings` table,
+  defaults to enabled). Manual Sync buttons ignore this toggle.
+- **LinkedIn saved searches**: the same **Disable auto-sync** / **Enable
+  auto-sync** toggle on each saved search (the `active` column). Manual Run
+  always works regardless of this setting.
+
+So: add a board or saved search once, and in production it keeps itself
+fresh daily unless you've disabled its auto-sync. Locally, sync it yourself
+when you want to check.
 
 ## Search preferences filter what you see (`/preferences`)
 
@@ -168,6 +184,38 @@ through the backlog a batch at a time.
 
 Scored jobs appear in the **"Recommended for you"** section at the top of
 `/jobs`, sorted by score.
+
+## The job list on `/jobs`
+
+The filtered list is paginated, 50 per page (`?page=` in the URL). A search
+box (`?q=`, matched against title/company/description) and a platform
+dropdown (`?source=`) narrow it further, on top of whatever the preferences
+filter already applies; both are plain GET params so the URL is shareable.
+Each row has a checkbox; check some and hit **Discard selected** to delete
+just those jobs. **Clear all non-matching jobs** (shown when preferences are
+configured) deletes every job that currently fails the preferences filter in
+one click. Both bulk-delete actions skip any job that already has an
+`applications` row — tracked jobs are never bulk-deleted.
+
+## Sync progress indicator
+
+Any Sync/Run/Discard/Clear button sets `aria-busy="true"` on itself while its
+server action is in flight (`SubmitButton`, via React's `useFormStatus`).
+Global CSS in `globals.css` keys off that attribute with a `:has()` selector
+to dim the page and show an indeterminate progress bar at the top — no extra
+state wiring, so it applies to every existing and future form on the page
+automatically.
+
+## Turning a job into a tracked application
+
+On a job's detail page (`/jobs/[id]`), **Track in applications** creates an
+`applications` row for it — status `matched` if a match score already exists
+for it, otherwise `discovered` — which is what makes it show up on
+`/applications`. Drafting a cover letter also creates this row if one doesn't
+exist yet (with status `drafted`). Running a match again re-scores the same
+job (button reads **Re-run match** once a score exists) — if Gemini fails or
+is rate-limited, the error is shown inline next to the button and the button
+stays there to retry.
 
 ## Automatic cleanup
 

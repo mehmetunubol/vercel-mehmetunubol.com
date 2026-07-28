@@ -1,13 +1,24 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { autoMatchNewJobsForUser } from "@/lib/auto-match";
 import { fetchArbeitnowJobs, fetchRemoteOkJobs } from "@/lib/ats/aggregators";
 import { fetchGreenhouseJobs } from "@/lib/ats/greenhouse";
 import { fetchLeverJobs } from "@/lib/ats/lever";
 import { db } from "@/lib/db";
-import { linkedinSavedSearches, searchPreferences, syncStatus, trackedBoards } from "@/lib/db/schema";
+import {
+  aggregatorSettings,
+  linkedinSavedSearches,
+  searchPreferences,
+  syncStatus,
+  trackedBoards,
+} from "@/lib/db/schema";
 import { recordSyncStatus, upsertJobs } from "@/lib/jobs";
 import { runSavedSearch } from "@/lib/linkedin";
+
+async function isAggregatorAutoSyncEnabled(id: string): Promise<boolean> {
+  const [setting] = await db.select().from(aggregatorSettings).where(eq(aggregatorSettings.id, id)).limit(1);
+  return setting?.autoSyncEnabled ?? true; // no row yet = default on
+}
 
 // Vercel Cron calls this with `Authorization: Bearer $CRON_SECRET` — see
 // vercel.json. Excluded from the auth proxy matcher (see src/proxy.ts).
@@ -19,7 +30,10 @@ export async function GET(request: Request) {
 
   const results: Record<string, number> = {};
 
-  const boards = await db.select().from(trackedBoards).where(eq(trackedBoards.active, true));
+  const boards = await db
+    .select()
+    .from(trackedBoards)
+    .where(and(eq(trackedBoards.active, true), eq(trackedBoards.autoSyncEnabled, true)));
   for (const board of boards) {
     const normalized =
       board.source === "greenhouse"
@@ -31,18 +45,22 @@ export async function GET(request: Request) {
     await db.update(trackedBoards).set({ lastFetchedAt: new Date() }).where(eq(trackedBoards.id, board.id));
   }
 
-  const remoteOk = await upsertJobs(await fetchRemoteOkJobs());
-  results.remoteok = remoteOk.processed;
-  await recordSyncStatus("aggregator:remoteok");
+  if (await isAggregatorAutoSyncEnabled("remoteok")) {
+    const remoteOk = await upsertJobs(await fetchRemoteOkJobs());
+    results.remoteok = remoteOk.processed;
+    await recordSyncStatus("aggregator:remoteok");
+  }
 
-  const [arbeitnowStatus] = await db
-    .select()
-    .from(syncStatus)
-    .where(eq(syncStatus.id, "aggregator:arbeitnow"))
-    .limit(1);
-  const arbeitnow = await upsertJobs(await fetchArbeitnowJobs(arbeitnowStatus?.lastSyncedAt.getTime()));
-  results.arbeitnow = arbeitnow.processed;
-  await recordSyncStatus("aggregator:arbeitnow");
+  if (await isAggregatorAutoSyncEnabled("arbeitnow")) {
+    const [arbeitnowStatus] = await db
+      .select()
+      .from(syncStatus)
+      .where(eq(syncStatus.id, "aggregator:arbeitnow"))
+      .limit(1);
+    const arbeitnow = await upsertJobs(await fetchArbeitnowJobs(arbeitnowStatus?.lastSyncedAt.getTime()));
+    results.arbeitnow = arbeitnow.processed;
+    await recordSyncStatus("aggregator:arbeitnow");
+  }
 
   const savedSearches = await db
     .select()
