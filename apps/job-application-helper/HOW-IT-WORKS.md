@@ -253,3 +253,12 @@ out stale, untouched postings so the `jobs` table doesn't grow forever. Same
 4. Check "Recommended for you" and the filtered job list on `/jobs`.
 5. Click into a job, draft a cover letter, and track it through
    `/applications`.
+
+## Moving a card on `/applications`
+
+Each card is draggable — drop it on another column to change its status.
+Every card also keeps a status dropdown + **Update** button as a
+non-drag alternative. Both call the same server action
+(`updateApplicationStatus` in `src/app/applications/page.tsx`) and update the
+card optimistically (`src/components/kanban-board.tsx`); on failure the move
+is rolled back and an inline error is shown.
