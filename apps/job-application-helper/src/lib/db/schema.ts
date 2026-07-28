@@ -31,6 +31,7 @@ export const jobSourceEnum = pgEnum("job_source", [
   "remoteok",
   "arbeitnow",
   "manual",
+  "linkedin",
 ]);
 
 export const users = pgTable("users", {
@@ -71,6 +72,30 @@ export const searchPreferences = pgTable("search_preferences", {
 export const syncStatus = pgTable("sync_status", {
   id: text("id").primaryKey(),
   lastSyncedAt: timestamp("last_synced_at").notNull(),
+});
+
+export const linkedinSavedSearches = pgTable("linkedin_saved_searches", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 128 }).notNull(),
+  keywords: varchar("keywords", { length: 256 }).notNull().default(""),
+  location: varchar("location", { length: 256 }).notNull().default(""),
+  // Cached typeaheadHits result for `location` — resolved lazily and reused
+  // until the location text changes.
+  geoId: varchar("geo_id", { length: 32 }),
+  postedWithin: varchar("posted_within", { length: 16 }),
+  experience: varchar("experience", { length: 16 }),
+  jobType: jsonb("job_type").$type<string[]>().notNull().default([]),
+  workplace: jsonb("workplace").$type<string[]>().notNull().default([]),
+  easyApplyOnly: boolean("easy_apply_only").default(false).notNull(),
+  fewApplicants: boolean("few_applicants").default(false).notNull(),
+  sort: varchar("sort", { length: 8 }).notNull().default("DD"),
+  radiusMiles: varchar("radius_miles", { length: 8 }),
+  active: boolean("active").default(true).notNull(),
+  lastRunAt: timestamp("last_run_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const trackedBoards = pgTable("tracked_boards", {
@@ -137,6 +162,11 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   profiles: many(profiles),
   applications: many(applications),
   searchPreferences: one(searchPreferences),
+  linkedinSavedSearches: many(linkedinSavedSearches),
+}));
+
+export const linkedinSavedSearchesRelations = relations(linkedinSavedSearches, ({ one }) => ({
+  user: one(users, { fields: [linkedinSavedSearches.userId], references: [users.id] }),
 }));
 
 export const searchPreferencesRelations = relations(searchPreferences, ({ one }) => ({

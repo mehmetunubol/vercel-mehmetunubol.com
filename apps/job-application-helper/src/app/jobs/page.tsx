@@ -9,8 +9,18 @@ import { fetchGreenhouseJobs } from "@/lib/ats/greenhouse";
 import { fetchLeverJobs } from "@/lib/ats/lever";
 import { requireUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { jobs, matches, profiles, searchPreferences, syncStatus, trackedBoards } from "@/lib/db/schema";
+import {
+  jobs,
+  linkedinSavedSearches,
+  matches,
+  profiles,
+  searchPreferences,
+  syncStatus,
+  trackedBoards,
+} from "@/lib/db/schema";
 import { recordSyncStatus, upsertJobs } from "@/lib/jobs";
+import { runSavedSearch } from "@/lib/linkedin";
+import type { ExperienceLevel, JobType, PostedWithin, Workplace } from "@/lib/linkedin/filters";
 import { preferenceWhereClause } from "@/lib/preferences";
 import { AppShell } from "@/components/app-shell";
 import { SubmitButton } from "@/components/submit-button";
@@ -118,9 +128,81 @@ async function pasteJob(formData: FormData) {
   revalidatePath("/jobs");
 }
 
+const JOB_TYPE_OPTIONS: JobType[] = ["full-time", "part-time", "contract", "temporary", "volunteer", "internship", "other"];
+const WORKPLACE_OPTIONS: Workplace[] = ["onsite", "remote", "hybrid"];
+const EXPERIENCE_OPTIONS: ExperienceLevel[] = ["intern", "entry", "associate", "senior", "director", "executive"];
+const POSTED_WITHIN_OPTIONS: PostedWithin[] = ["1h", "24h", "week", "month"];
+
+async function addSavedSearch(formData: FormData) {
+  "use server";
+  const userId = await requireUserId();
+  if (!userId) return;
+
+  const name = formData.get("name");
+  const keywords = formData.get("keywords");
+  const location = formData.get("location");
+  if (typeof name !== "string" || !name) return;
+
+  await db.insert(linkedinSavedSearches).values({
+    userId,
+    name,
+    keywords: typeof keywords === "string" ? keywords : "",
+    location: typeof location === "string" ? location : "",
+    postedWithin: (formData.get("postedWithin") as string) || null,
+    experience: (formData.get("experience") as string) || null,
+    jobType: formData.getAll("jobType").filter((value): value is string => typeof value === "string"),
+    workplace: formData.getAll("workplace").filter((value): value is string => typeof value === "string"),
+    easyApplyOnly: formData.get("easyApplyOnly") === "on",
+    fewApplicants: formData.get("fewApplicants") === "on",
+  });
+  revalidatePath("/jobs");
+}
+
+async function runSavedSearchAction(formData: FormData) {
+  "use server";
+  const userId = await requireUserId();
+  if (!userId) return;
+
+  const searchId = formData.get("searchId");
+  if (typeof searchId !== "string") return;
+
+  const [savedSearch] = await db
+    .select()
+    .from(linkedinSavedSearches)
+    .where(eq(linkedinSavedSearches.id, searchId))
+    .limit(1);
+  if (!savedSearch) return;
+
+  const normalized = await runSavedSearch(savedSearch);
+  await upsertJobs(normalized);
+  await db
+    .update(linkedinSavedSearches)
+    .set({ lastRunAt: new Date() })
+    .where(eq(linkedinSavedSearches.id, searchId));
+  await autoMatchNewJobsForUser(userId);
+  revalidatePath("/jobs");
+  revalidatePath("/dashboard");
+}
+
+async function deleteSavedSearch(formData: FormData) {
+  "use server";
+  const userId = await requireUserId();
+  if (!userId) return;
+
+  const searchId = formData.get("searchId");
+  if (typeof searchId !== "string") return;
+
+  await db.delete(linkedinSavedSearches).where(eq(linkedinSavedSearches.id, searchId));
+  revalidatePath("/jobs");
+}
+
 export default async function JobsPage() {
   const userId = await requireUserId();
   const boards = await db.select().from(trackedBoards).orderBy(desc(trackedBoards.createdAt));
+  const savedSearches = await db
+    .select()
+    .from(linkedinSavedSearches)
+    .orderBy(desc(linkedinSavedSearches.createdAt));
 
   const [prefs] = userId
     ? await db.select().from(searchPreferences).where(eq(searchPreferences.userId, userId)).limit(1)
@@ -274,6 +356,91 @@ export default async function JobsPage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">LinkedIn saved searches</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <form action={addSavedSearch} className="grid gap-2 sm:grid-cols-2">
+              <input name="name" placeholder="Search name" required className={inputClass} />
+              <input name="keywords" placeholder="Keywords" className={inputClass} />
+              <input name="location" placeholder="Location (e.g. Türkiye)" className={inputClass} />
+              <select name="postedWithin" className={`${inputClass}`} defaultValue="">
+                <option value="">Posted anytime</option>
+                {POSTED_WITHIN_OPTIONS.map((value) => (
+                  <option key={value} value={value}>
+                    Last {value}
+                  </option>
+                ))}
+              </select>
+              <select name="experience" className={inputClass} defaultValue="">
+                <option value="">Any experience</option>
+                {EXPERIENCE_OPTIONS.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+              <div className="flex flex-wrap gap-2 text-xs text-muted sm:col-span-2">
+                {WORKPLACE_OPTIONS.map((value) => (
+                  <label key={value} className="flex items-center gap-1">
+                    <input type="checkbox" name="workplace" value={value} /> {value}
+                  </label>
+                ))}
+                {JOB_TYPE_OPTIONS.map((value) => (
+                  <label key={value} className="flex items-center gap-1">
+                    <input type="checkbox" name="jobType" value={value} /> {value}
+                  </label>
+                ))}
+                <label className="flex items-center gap-1">
+                  <input type="checkbox" name="easyApplyOnly" /> Easy Apply only
+                </label>
+                <label className="flex items-center gap-1">
+                  <input type="checkbox" name="fewApplicants" /> Few applicants
+                </label>
+              </div>
+              <SubmitButton size="sm" pendingText="Saving…" className="sm:col-span-2 w-fit">
+                Save search
+              </SubmitButton>
+            </form>
+
+            {savedSearches.length > 0 ? (
+              <ul className="space-y-2">
+                {savedSearches.map((search) => (
+                  <li
+                    key={search.id}
+                    className="flex items-center justify-between gap-2 rounded-md border border-border p-2 text-sm"
+                  >
+                    <span className="min-w-0 truncate">
+                      {search.name}{" "}
+                      <span className="text-xs text-muted">
+                        {search.keywords || "any keywords"}
+                        {search.location ? ` · ${search.location}` : ""}
+                      </span>
+                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <form action={runSavedSearchAction}>
+                        <input type="hidden" name="searchId" value={search.id} />
+                        <SubmitButton size="sm" variant="outline" pendingText="Running…">
+                          Run
+                        </SubmitButton>
+                      </form>
+                      <form action={deleteSavedSearch}>
+                        <input type="hidden" name="searchId" value={search.id} />
+                        <SubmitButton size="sm" variant="ghost" pendingText="Deleting…">
+                          Delete
+                        </SubmitButton>
+                      </form>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-muted">No saved searches yet — add one above.</p>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

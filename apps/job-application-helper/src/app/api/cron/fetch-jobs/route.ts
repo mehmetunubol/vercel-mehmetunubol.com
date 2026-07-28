@@ -5,8 +5,9 @@ import { fetchArbeitnowJobs, fetchRemoteOkJobs } from "@/lib/ats/aggregators";
 import { fetchGreenhouseJobs } from "@/lib/ats/greenhouse";
 import { fetchLeverJobs } from "@/lib/ats/lever";
 import { db } from "@/lib/db";
-import { searchPreferences, syncStatus, trackedBoards } from "@/lib/db/schema";
+import { linkedinSavedSearches, searchPreferences, syncStatus, trackedBoards } from "@/lib/db/schema";
 import { recordSyncStatus, upsertJobs } from "@/lib/jobs";
+import { runSavedSearch } from "@/lib/linkedin";
 
 // Vercel Cron calls this with `Authorization: Bearer $CRON_SECRET` — see
 // vercel.json. Excluded from the auth proxy matcher (see src/proxy.ts).
@@ -42,6 +43,25 @@ export async function GET(request: Request) {
   const arbeitnow = await upsertJobs(await fetchArbeitnowJobs(arbeitnowStatus?.lastSyncedAt.getTime()));
   results.arbeitnow = arbeitnow.processed;
   await recordSyncStatus("aggregator:arbeitnow");
+
+  const savedSearches = await db
+    .select()
+    .from(linkedinSavedSearches)
+    .where(eq(linkedinSavedSearches.active, true));
+  for (const savedSearch of savedSearches) {
+    try {
+      const normalized = await runSavedSearch(savedSearch);
+      const { processed } = await upsertJobs(normalized);
+      results[`linkedin:${savedSearch.name}`] = processed;
+    } catch (error) {
+      results[`linkedin:${savedSearch.name}`] = -1;
+      console.error(`LinkedIn saved search "${savedSearch.name}" failed:`, error);
+    }
+    await db
+      .update(linkedinSavedSearches)
+      .set({ lastRunAt: new Date() })
+      .where(eq(linkedinSavedSearches.id, savedSearch.id));
+  }
 
   const usersWithPrefs = await db.select({ userId: searchPreferences.userId }).from(searchPreferences);
   const autoMatchResults: Record<string, unknown> = {};

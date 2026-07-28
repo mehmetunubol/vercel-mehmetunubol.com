@@ -7,7 +7,7 @@ Short version: **nothing runs automatically unless it's deployed to production.*
 Locally, every sync is a button you click. In production, one daily cron job
 clicks those same buttons for you.
 
-## The three ways jobs get into the database
+## The four ways jobs get into the database
 
 1. **Tracked boards** (Greenhouse / Lever) — you register a specific company's
    job board once, then sync it (manually, or via the daily cron in prod) to
@@ -21,10 +21,11 @@ clicks those same buttons for you.
    manual Sync button and the daily cron pass the stored `lastSyncedAt` for
    `aggregator:arbeitnow` (`sync_status` table) as that cutoff, so only jobs
    posted since the last sync are fetched.
-3. **Paste a job** — you paste in a posting by hand (for job boards with no
+3. **LinkedIn saved searches** — see the dedicated section below.
+4. **Paste a job** — you paste in a posting by hand (for job boards with no
    API, or a one-off you found on LinkedIn).
 
-All three write into the same `jobs` table via `upsertJobs()`
+All four write into the same `jobs` table via `upsertJobs()`
 (`src/lib/jobs.ts`) — re-syncing an existing job updates it in place instead
 of duplicating it.
 
@@ -46,16 +47,81 @@ Once added, it shows up in the tracked list with a **Sync** button, plus an
 it stops showing up for Sync and the daily cron skips it, but its jobs stay in
 the database. Hit **Retrack** to resume it.
 
+## LinkedIn saved searches
+
+Go to `/jobs` → "LinkedIn saved searches" to add one:
+
+- **Search name** — a label for the saved search.
+- **Keywords** — free text, passed through as-is.
+- **Location** — a place name (e.g. "Türkiye"); resolved to a LinkedIn geoId
+  on first run via the typeahead endpoint and cached on the saved search row
+  (`geo_id` column) so it isn't re-resolved every run.
+- **Posted within** — anytime / 1h / 24h / week / month.
+- **Experience** — intern / entry / associate / senior / director / executive.
+- **Workplace** and **job type** — multi-select checkboxes.
+- **Easy Apply only** / **Few applicants** — checkboxes.
+
+Hit **Run** to run it immediately, or **Delete** to remove it. Saved searches
+also run as part of the daily cron (see below).
+
+Implementation: `src/lib/linkedin/`.
+
+- `filters.ts` serializes the typed options above into LinkedIn's guest-search
+  `f_*`/`sortBy`/`start` query params (`serializeFilters()`); callers never
+  construct those params directly.
+- `scraper.ts`'s `pageSearch()` is an async generator that pages
+  `jobs-guest/jobs/api/seeMoreJobPostings/search` sequentially with a
+  randomized 2–5s delay between pages, up to `start` = 1000 (LinkedIn's guest
+  pagination ceiling — larger result sets need narrower `postedWithin`
+  windows or separate per-geo saved searches instead of deeper paging). A
+  `429` response throws `RateLimitError` immediately, no retry. A 0-card page
+  is checked against `assertNotBlocked()`: a short response body throws
+  `BlockedError` instead of being treated as "no results," since a
+  soft-blocked response and a genuinely empty one both come back as a 0-card
+  200. `parse.ts`'s `parseSearchResults()` additionally throws whenever a
+  non-empty body parses to zero cards at all (selector breakage), even for
+  longer bodies.
+- `parse.ts` (cheerio) turns each `<li>` card into `{jobId, title, company,
+  location, url, postedAt}`; all CSS selectors live in `selectors.ts`'s
+  `SELECTORS` constant, called out there as volatile.
+- `dedupe.ts`'s `normalizedJobKey()` (lowercased, whitespace-collapsed
+  `company::title::location`) and `buildDuplicateKeyIndex()` catch postings
+  already present under a different source (e.g. pasted by hand) — a
+  LinkedIn find whose normalized key already exists in the `jobs` table is
+  dropped before it's added, so it isn't duplicated. Same-source re-finds are
+  already deduplicated by the `(source, external_id)` unique index via
+  `upsertJobs()`.
+- `index.ts`'s `runSavedSearch()` ties it together: resolves/caches the
+  geoId, pages results, drops cross-source duplicates, fetches a description
+  per new listing via `fetchJobDescription()` (also 2–5s delayed), and
+  returns `NormalizedJob[]` for `upsertJobs()`. It does not catch
+  `RateLimitError`/`BlockedError` — those propagate so a run fails loudly
+  instead of silently reporting zero new jobs.
+- Discovered LinkedIn jobs land in the same `jobs` table as every other
+  source, at the same pre-application state as any other newly discovered
+  job — nothing about them is marked "applied" until you draft a cover
+  letter or otherwise create an `applications` row for them.
+
+LinkedIn's User Agreement prohibits automated access to the site even though
+the underlying job data is public. This integration only hits the
+unauthenticated guest endpoints (no login, no cookies, no headless browser)
+and is intended for personal use at a low, human-paced request rate — a
+managed job-data provider (e.g. Adzuna, Jooble) would be the appropriate
+choice at any larger scale.
+
 ## What "automatic" actually means
 
 - **Locally (`pnpm dev`)**: nothing is automatic. You click Sync on a board,
-  or Sync RemoteOK / Sync Arbeitnow, whenever you want fresh postings.
+  Sync RemoteOK / Sync Arbeitnow, or Run on a saved search, whenever you want
+  fresh postings.
 - **In production (Vercel)**: `vercel.json` defines a daily cron
   (`0 7 * * *`, once a day — Vercel's Hobby plan caps cron frequency) that
   hits `/api/cron/fetch-jobs`. That route re-syncs **every active tracked
-  board** plus **both aggregators**, in sequence, no user interaction needed.
-  It's protected by a `CRON_SECRET` bearer token so only Vercel's scheduler
-  can trigger it.
+  board**, **both aggregators**, and **every active LinkedIn saved search**,
+  in sequence, no user interaction needed. It's protected by a `CRON_SECRET`
+  bearer token so only Vercel's scheduler can trigger it. A saved search that
+  throws (rate-limited or blocked) is caught and logged per-search so it
+  doesn't stop the rest of that cron run.
 
 So: add a board once, and in production it keeps itself fresh daily. Locally,
 sync it yourself when you want to check.
