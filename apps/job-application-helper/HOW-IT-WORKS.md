@@ -193,11 +193,17 @@ and scores up to **8 of them** against your most recent CV/profile using
 Gemini, saving the result. This is capped on purpose — matching every job on
 every sync would be slow and burn through Gemini's free-tier quota fast. If
 you have more than 8 new relevant jobs waiting, run the sync again to work
-through the backlog a batch at a time. The 8 Gemini calls in a batch are
-spaced 2s apart rather than fired back to back, to stay under the free
-tier's requests-per-minute limit. Any Gemini call (auto-match, manual match,
-cover letter draft) that hits a 429 backs off longer before retrying than a
-transient error would (`withGeminiRetry` in `src/lib/gemini.ts`).
+through the backlog a batch at a time.
+
+Every Gemini call in the app — auto-match's batch, manual match, cover
+letter draft, CV parsing, profile fetch parsing — funnels through
+`withGeminiRetry()` (`src/lib/gemini.ts`), which enforces a process-wide
+minimum 4s gap between calls regardless of which feature triggered them, so
+back-to-back actions across different parts of the app don't race the same
+free-tier per-minute quota window. On a 429, it reads the API's own
+`retryDelay` from the error and waits exactly that long before retrying;
+without one, it falls back to a longer backoff than a transient
+503/network error would get.
 
 Scored jobs appear in the **"Recommended for you"** section at the top of
 `/jobs`, sorted by score.

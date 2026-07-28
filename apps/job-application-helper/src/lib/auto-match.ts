@@ -45,9 +45,10 @@ export async function autoMatchNewJobsForUser(userId: string) {
     .orderBy(desc(jobs.discoveredAt))
     .limit(MAX_AUTO_MATCHES_PER_RUN);
 
+  // withGeminiRetry() throttles every call process-wide (see src/lib/gemini.ts) —
+  // no extra spacing needed here on top of that.
   let matched = 0;
-  for (let i = 0; i < candidates.length; i++) {
-    const job = candidates[i]!;
+  for (const job of candidates) {
     const result = await matchJobToProfile(job.title, job.company, job.rawDescription, profileData);
     if (result) {
       await db.insert(matches).values({
@@ -57,13 +58,6 @@ export async function autoMatchNewJobsForUser(userId: string) {
         rationale: result.rationale,
       });
       matched += 1;
-    }
-
-    // Firing all 8 calls back-to-back reliably blew through Gemini
-    // free-tier's requests-per-minute quota (429s from the very first
-    // sync). Space them out instead of racing them.
-    if (i < candidates.length - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   }
 
