@@ -385,6 +385,14 @@ export default async function JobsPage({
     return `/jobs?${params.toString()}`;
   };
 
+  const hrefWithout = (param: "q" | "source") => {
+    const params = new URLSearchParams();
+    if (q && param !== "q") params.set("q", q);
+    if (sourceFilter && param !== "source") params.set("source", sourceFilter);
+    return params.toString() ? `/jobs?${params.toString()}` : "/jobs";
+  };
+  const noSources = boards.length === 0 && savedSearches.length === 0;
+
   return (
     <AppShell>
       <div className="space-y-8">
@@ -422,6 +430,17 @@ export default async function JobsPage({
           </Card>
         )}
 
+        <details open={noSources} className="group rounded-lg border border-border">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 marker:content-none">
+            <span className="text-sm font-medium">Manage job sources</span>
+            <span className="flex items-center gap-2 text-xs text-muted">
+              {boards.length} board{boards.length === 1 ? "" : "s"} · {savedSearches.length} LinkedIn search
+              {savedSearches.length === 1 ? "" : "es"}
+              <span className="inline-block transition-transform group-open:rotate-180">▾</span>
+            </span>
+          </summary>
+
+          <div className="space-y-4 border-t border-border p-4 pt-4">
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
@@ -662,14 +681,17 @@ export default async function JobsPage({
             </form>
           </CardContent>
         </Card>
+          </div>
+        </details>
 
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-medium text-muted">
-              {prefs
-                ? `Jobs matching preferences — ${filteredCount} total, showing ${filteredJobs.length} (page ${page} of ${totalPages})`
-                : `Jobs — ${filteredCount} total, showing ${filteredJobs.length} (page ${page} of ${totalPages})`}
-            </h2>
+        <Card>
+          <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+            <div>
+              <CardTitle className="text-base">{prefs ? "Jobs matching preferences" : "Jobs"}</CardTitle>
+              <p className="mt-1 text-xs text-muted">
+                {filteredCount} total · showing {filteredJobs.length} · page {page} of {totalPages}
+              </p>
+            </div>
             {prefs ? (
               <form action={clearUnmatchedJobs}>
                 <SubmitButton size="sm" variant="ghost" className="text-red-500" pendingText="Clearing…">
@@ -677,36 +699,78 @@ export default async function JobsPage({
                 </SubmitButton>
               </form>
             ) : null}
-          </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <form className="flex flex-wrap items-end gap-2" action="/jobs">
+              <div className="flex-1 space-y-1">
+                <label htmlFor="jobs-search-q" className="text-xs text-muted">
+                  Search
+                </label>
+                <input
+                  id="jobs-search-q"
+                  name="q"
+                  defaultValue={q ?? ""}
+                  placeholder="Title, company, description…"
+                  className={inputClass}
+                />
+              </div>
+              <div className="w-auto space-y-1">
+                <label htmlFor="jobs-search-source" className="text-xs text-muted">
+                  Platform
+                </label>
+                <select
+                  id="jobs-search-source"
+                  name="source"
+                  defaultValue={sourceFilter ?? ""}
+                  className={`${inputClass} w-auto`}
+                >
+                  <option value="">Any platform</option>
+                  {SOURCE_OPTIONS.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <SubmitButton size="sm" variant="outline" pendingText="Filtering…">
+                Search
+              </SubmitButton>
+            </form>
 
-          <form className="flex flex-wrap gap-2" action="/jobs">
-            <input
-              name="q"
-              defaultValue={q ?? ""}
-              placeholder="Search title, company, description…"
-              className={`${inputClass} flex-1`}
-            />
-            <select name="source" defaultValue={sourceFilter ?? ""} className={`${inputClass} w-auto`}>
-              <option value="">Any platform</option>
-              {SOURCE_OPTIONS.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-            <SubmitButton size="sm" variant="outline" pendingText="Filtering…">
-              Filter
-            </SubmitButton>
             {q || sourceFilter ? (
-              <Link href="/jobs" className="inline-flex items-center text-sm text-accent hover:underline">
-                Clear filters
-              </Link>
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="text-muted">Filtering by:</span>
+                {q ? (
+                  <Link
+                    href={hrefWithout("q")}
+                    className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 hover:border-accent/40"
+                  >
+                    “{q}” <span aria-hidden="true">×</span>
+                    <span className="sr-only">Remove search filter</span>
+                  </Link>
+                ) : null}
+                {sourceFilter ? (
+                  <Link
+                    href={hrefWithout("source")}
+                    className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 capitalize hover:border-accent/40"
+                  >
+                    {sourceFilter} <span aria-hidden="true">×</span>
+                    <span className="sr-only">Remove platform filter</span>
+                  </Link>
+                ) : null}
+                <Link href="/jobs" className="text-accent hover:underline">
+                  Clear all
+                </Link>
+              </div>
             ) : null}
-          </form>
 
           {filteredJobs.length === 0 ? (
             <p className="text-sm text-muted">
-              {prefs ? "No jobs match your search preferences yet." : "No jobs yet."}
+              {q || sourceFilter
+                ? "No jobs match this search — try different keywords or clear the filters."
+                : prefs
+                  ? "No jobs match your search preferences yet."
+                  : "No jobs yet."}
             </p>
           ) : (
             <form action={discardSelectedJobs} className="space-y-2">
@@ -743,28 +807,39 @@ export default async function JobsPage({
             </form>
           )}
 
-          {totalPages > 1 ? (
-            <div className="flex items-center justify-center gap-2 pt-2 text-sm">
-              {page > 1 ? (
-                <Link href={pageHref(page - 1)} className="text-accent hover:underline">
-                  ← Prev
-                </Link>
-              ) : (
-                <span className="text-muted">← Prev</span>
-              )}
-              <span className="text-muted">
-                {page} / {totalPages}
-              </span>
-              {page < totalPages ? (
-                <Link href={pageHref(page + 1)} className="text-accent hover:underline">
-                  Next →
-                </Link>
-              ) : (
-                <span className="text-muted">Next →</span>
-              )}
-            </div>
-          ) : null}
-        </div>
+            {totalPages > 1 ? (
+              <div className="flex items-center justify-center gap-3 pt-2 text-sm">
+                {page > 1 ? (
+                  <Link
+                    href={pageHref(page - 1)}
+                    className="rounded-md border border-border px-2.5 py-1 text-xs transition-colors hover:border-accent/40"
+                  >
+                    ← Prev
+                  </Link>
+                ) : (
+                  <span className="rounded-md border border-border px-2.5 py-1 text-xs text-muted opacity-50">
+                    ← Prev
+                  </span>
+                )}
+                <span className="text-xs text-muted">
+                  Page {page} of {totalPages}
+                </span>
+                {page < totalPages ? (
+                  <Link
+                    href={pageHref(page + 1)}
+                    className="rounded-md border border-border px-2.5 py-1 text-xs transition-colors hover:border-accent/40"
+                  >
+                    Next →
+                  </Link>
+                ) : (
+                  <span className="rounded-md border border-border px-2.5 py-1 text-xs text-muted opacity-50">
+                    Next →
+                  </span>
+                )}
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
       </div>
     </AppShell>
   );
