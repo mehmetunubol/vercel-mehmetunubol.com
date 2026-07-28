@@ -338,14 +338,15 @@ export default async function JobsPage({
     .where(whereClause);
   const filteredCount = countRows[0]?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
-  // Jobs already moved past "discovered" in /applications sort to the end of
-  // the list (in SQL, so it holds across pages) and get an "In application"
-  // tag — no need to keep scanning past jobs you've already progressed.
+  // Any job with an applications row (any status, including "discovered" —
+  // matches the "Tracked — {status}" badge already shown on the job detail
+  // page) sorts to the end of the list (in SQL, so it holds across pages)
+  // and gets an "In application" tag — no need to keep scanning past jobs
+  // you've already tracked.
   const applicationStatusSql = userId
     ? sql<string | null>`(
         SELECT ${applications.status} FROM ${applications}
         WHERE ${applications.jobId} = ${jobs.id} AND ${applications.userId} = ${userId}
-          AND ${applications.status} <> 'discovered'
         ORDER BY ${applications.updatedAt} DESC LIMIT 1
       )`
     : sql<string | null>`NULL`;
@@ -353,7 +354,6 @@ export default async function JobsPage({
     ? sql<number>`(CASE WHEN EXISTS (
         SELECT 1 FROM ${applications}
         WHERE ${applications.jobId} = ${jobs.id} AND ${applications.userId} = ${userId}
-          AND ${applications.status} <> 'discovered'
       ) THEN 1 ELSE 0 END)`
     : sql<number>`0`;
   const filteredJobs = await db

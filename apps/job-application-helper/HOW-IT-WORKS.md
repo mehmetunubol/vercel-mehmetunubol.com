@@ -214,11 +214,11 @@ configured) deletes every job that currently fails the preferences filter in
 one click. Both bulk-delete actions skip any job that already has an
 `applications` row — tracked jobs are never bulk-deleted.
 
-A job whose application has moved past the `discovered` status (i.e. it's
-matched/drafted/ready/applied/interviewing/rejected/offer on `/applications`)
-gets an "In application — &lt;status&gt;" tag, is shown dimmed, and sorts to
-the end of the list — this is computed in SQL so it holds across pages, not
-just within one page.
+Any job with an `applications` row — any status, including `discovered`,
+matching the "Tracked — &lt;status&gt;" badge on the job detail page — gets
+an "In application — &lt;status&gt;" tag here too, is shown dimmed, and sorts
+to the end of the list. This is computed in SQL so it holds across pages,
+not just within one page.
 
 ## Sync progress indicator
 
