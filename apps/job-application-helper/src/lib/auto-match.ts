@@ -1,13 +1,23 @@
 import { and, desc, eq, notInArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { jobs, matches, profiles, searchPreferences } from "@/lib/db/schema";
+import { isGeminiQuotaExhaustedForToday } from "@/lib/gemini";
 import { preferenceWhereClause } from "@/lib/preferences";
 import { matchJobToProfile } from "@/lib/matching";
 import { profileDataSchema } from "@/lib/profile-schema";
 
-const MAX_AUTO_MATCHES_PER_RUN = 8;
+// Gemini free-tier's actual limit (confirmed from a real 429 body) is a
+// hard 20 requests/day for this model — shared across auto-match, manual
+// match, cover letter drafts, and CV parsing. Automatic matching on every
+// sync burned through that budget before any manual button click got a
+// chance at it. Disabled by setting the per-run cap to 0 — Gemini now only
+// runs when a "Match against profile" / "Draft cover letter" button is
+// clicked. Raise this above 0 to re-enable auto-match.
+const MAX_AUTO_MATCHES_PER_RUN = 0;
 
 export async function autoMatchNewJobsForUser(userId: string) {
+  if (MAX_AUTO_MATCHES_PER_RUN <= 0) return { matched: 0, skipped: "auto-match disabled" };
+
   const [prefs] = await db
     .select()
     .from(searchPreferences)
@@ -49,6 +59,8 @@ export async function autoMatchNewJobsForUser(userId: string) {
   // no extra spacing needed here on top of that.
   let matched = 0;
   for (const job of candidates) {
+    if (isGeminiQuotaExhaustedForToday()) break; // rest of the batch would just fail too
+
     const result = await matchJobToProfile(job.title, job.company, job.rawDescription, profileData);
     if (result) {
       await db.insert(matches).values({

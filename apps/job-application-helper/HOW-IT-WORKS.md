@@ -183,27 +183,44 @@ recent postings. If this ever gets rewritten, keep the filter ahead of any
 
 ## Auto-match against your CV
 
-Whenever a sync happens (board, aggregator, paste, or the daily cron), the
-app also looks at jobs that:
+**Currently disabled** (`MAX_AUTO_MATCHES_PER_RUN = 0` in
+`src/lib/auto-match.ts`) — Gemini's free-tier daily quota (see below) was
+being consumed by automatic matching on every sync before any manual button
+click got a chance at it. `autoMatchNewJobsForUser()` now returns
+immediately (`{matched: 0, skipped: "auto-match disabled"}`) without
+querying the database or calling Gemini. Gemini only runs when you click
+**Match against profile** or **Draft cover letter** on a job's page.
 
-1. pass your search preferences, and
-2. don't already have a match score for your latest profile,
+When enabled, a sync (board, aggregator, paste, or the daily cron) looks at
+jobs that pass your search preferences and don't already have a match score
+for your latest profile, and scores up to the configured cap of them against
+your most recent CV/profile using Gemini, saving the result. Raise
+`MAX_AUTO_MATCHES_PER_RUN` above 0 to turn it back on.
 
-and scores up to **8 of them** against your most recent CV/profile using
-Gemini, saving the result. This is capped on purpose — matching every job on
-every sync would be slow and burn through Gemini's free-tier quota fast. If
-you have more than 8 new relevant jobs waiting, run the sync again to work
-through the backlog a batch at a time.
+Gemini's free tier for `gemini-3.5-flash` is a hard **20 requests per day**
+(confirmed from a real 429 body's `quotaId:
+GenerateRequestsPerDayPerProjectPerModel-FreeTier`) — not a per-minute
+limit. That daily budget is shared across every Gemini feature: auto-match's
+batch, manual match, cover letter drafts, and CV parsing.
 
-Every Gemini call in the app — auto-match's batch, manual match, cover
-letter draft, CV parsing, profile fetch parsing — funnels through
-`withGeminiRetry()` (`src/lib/gemini.ts`), which enforces a process-wide
-minimum 4s gap between calls regardless of which feature triggered them, so
-back-to-back actions across different parts of the app don't race the same
-free-tier per-minute quota window. On a 429, it reads the API's own
-`retryDelay` from the error and waits exactly that long before retrying;
-without one, it falls back to a longer backoff than a transient
-503/network error would get.
+Every Gemini call funnels through `withGeminiRetry()` (`src/lib/gemini.ts`):
+
+- Enforces a process-wide minimum 4s gap between calls regardless of which
+  feature triggered them, so back-to-back actions across different parts of
+  the app don't race the same quota window.
+- On a 429, checks whether it's the daily-quota error specifically. If so,
+  it does **not** retry (the `retryDelay` a daily-quota 429 reports doesn't
+  mean the daily cap actually resets that soon — retrying just fails again)
+  and instead remembers the exhaustion until the next UTC day. Every later
+  Gemini call that day — auto-match, manual match, cover letter draft, CV
+  parse — fails immediately without even hitting the API, and the auto-match
+  batch loop stops early instead of trying (and failing) the rest of its
+  candidates. `isGeminiQuotaExhaustedForToday()` lets callers show "daily
+  quota used up, try again after it resets" instead of a generic failure
+  message.
+- Any other 429 (a genuine per-minute/transient limit) backs off using the
+  API's own `retryDelay` when given, or a longer backoff than a transient
+  503/network error would get otherwise, and does retry.
 
 Scored jobs appear in the **"Recommended for you"** section at the top of
 `/jobs`, sorted by score.

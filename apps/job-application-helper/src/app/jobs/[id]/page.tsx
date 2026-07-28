@@ -6,13 +6,17 @@ import { requireUserId } from "@/lib/auth";
 import { generateCoverLetter } from "@/lib/cover-letter";
 import { db } from "@/lib/db";
 import { applications, jobs, matches, profiles } from "@/lib/db/schema";
+import { isGeminiQuotaExhaustedForToday } from "@/lib/gemini";
 import { matchJobToProfile } from "@/lib/matching";
 import { profileDataSchema } from "@/lib/profile-schema";
 import { AppShell } from "@/components/app-shell";
 import { ActionForm, type ActionResult } from "@/components/action-form";
 
-const GEMINI_FAILURE_MESSAGE =
-  "Gemini didn't return a result (often a free-tier quota limit) — try again in a bit.";
+function geminiFailureMessage(): string {
+  return isGeminiQuotaExhaustedForToday()
+    ? "Gemini's free-tier daily quota (20 requests) is used up — try again after it resets."
+    : "Gemini didn't return a result (transient error) — try again in a bit.";
+}
 
 async function runMatch(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
   "use server";
@@ -31,7 +35,7 @@ async function runMatch(_prevState: ActionResult | null, formData: FormData): Pr
 
   const profileData = profileDataSchema.parse(profile.data);
   const result = await matchJobToProfile(job.title, job.company, job.rawDescription, profileData);
-  if (!result) return { ok: false, message: GEMINI_FAILURE_MESSAGE };
+  if (!result) return { ok: false, message: geminiFailureMessage() };
 
   await db.insert(matches).values({ jobId, profileId, score: result.score, rationale: result.rationale });
   revalidatePath(`/jobs/${jobId}`);
@@ -58,7 +62,7 @@ async function draftCoverLetter(
 
   const profileData = profileDataSchema.parse(profile.data);
   const coverLetter = await generateCoverLetter(job.title, job.company, job.rawDescription, profileData);
-  if (!coverLetter) return { ok: false, message: GEMINI_FAILURE_MESSAGE };
+  if (!coverLetter) return { ok: false, message: geminiFailureMessage() };
 
   const [existing] = await db
     .select()
