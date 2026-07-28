@@ -1,5 +1,5 @@
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@repo/ui";
-import { and, desc, eq, ilike, inArray, not, notExists, or, sql } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, ilike, inArray, not, notExists, or, sql } from "drizzle-orm";
 import Link from "next/link";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -338,11 +338,29 @@ export default async function JobsPage({
     .where(whereClause);
   const filteredCount = countRows[0]?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
+  // Jobs already moved past "discovered" in /applications sort to the end of
+  // the list (in SQL, so it holds across pages) and get an "In application"
+  // tag — no need to keep scanning past jobs you've already progressed.
+  const applicationStatusSql = userId
+    ? sql<string | null>`(
+        SELECT ${applications.status} FROM ${applications}
+        WHERE ${applications.jobId} = ${jobs.id} AND ${applications.userId} = ${userId}
+          AND ${applications.status} <> 'discovered'
+        ORDER BY ${applications.updatedAt} DESC LIMIT 1
+      )`
+    : sql<string | null>`NULL`;
+  const progressedRank = userId
+    ? sql<number>`(CASE WHEN EXISTS (
+        SELECT 1 FROM ${applications}
+        WHERE ${applications.jobId} = ${jobs.id} AND ${applications.userId} = ${userId}
+          AND ${applications.status} <> 'discovered'
+      ) THEN 1 ELSE 0 END)`
+    : sql<number>`0`;
   const filteredJobs = await db
-    .select()
+    .select({ ...getTableColumns(jobs), applicationStatus: applicationStatusSql })
     .from(jobs)
     .where(whereClause)
-    .orderBy(desc(jobs.discoveredAt))
+    .orderBy(progressedRank, desc(jobs.discoveredAt))
     .limit(PAGE_SIZE)
     .offset((page - 1) * PAGE_SIZE);
 
@@ -696,7 +714,9 @@ export default async function JobsPage({
                 {filteredJobs.map((job) => (
                   <li
                     key={job.id}
-                    className="flex items-center gap-2 rounded-md border border-border p-3 text-sm transition-colors hover:border-accent/40"
+                    className={`flex items-center gap-2 rounded-md border border-border p-3 text-sm transition-colors hover:border-accent/40 ${
+                      job.applicationStatus ? "opacity-60" : ""
+                    }`}
                   >
                     <label className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center">
                       <input type="checkbox" name="jobIds" value={job.id} className="h-4 w-4 accent-accent" />
@@ -705,9 +725,14 @@ export default async function JobsPage({
                       <span className="min-w-0 truncate font-medium">
                         {job.title} <span className="font-normal text-muted">— {job.company}</span>
                       </span>
-                      <Badge variant="outline" className="shrink-0">
-                        {job.source}
-                      </Badge>
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        {job.applicationStatus ? (
+                          <Badge variant="accent" className="capitalize">
+                            In application — {job.applicationStatus}
+                          </Badge>
+                        ) : null}
+                        <Badge variant="outline">{job.source}</Badge>
+                      </span>
                     </Link>
                   </li>
                 ))}

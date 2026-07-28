@@ -193,7 +193,11 @@ and scores up to **8 of them** against your most recent CV/profile using
 Gemini, saving the result. This is capped on purpose — matching every job on
 every sync would be slow and burn through Gemini's free-tier quota fast. If
 you have more than 8 new relevant jobs waiting, run the sync again to work
-through the backlog a batch at a time.
+through the backlog a batch at a time. The 8 Gemini calls in a batch are
+spaced 2s apart rather than fired back to back, to stay under the free
+tier's requests-per-minute limit. Any Gemini call (auto-match, manual match,
+cover letter draft) that hits a 429 backs off longer before retrying than a
+transient error would (`withGeminiRetry` in `src/lib/gemini.ts`).
 
 Scored jobs appear in the **"Recommended for you"** section at the top of
 `/jobs`, sorted by score.
@@ -209,6 +213,12 @@ just those jobs. **Clear all non-matching jobs** (shown when preferences are
 configured) deletes every job that currently fails the preferences filter in
 one click. Both bulk-delete actions skip any job that already has an
 `applications` row — tracked jobs are never bulk-deleted.
+
+A job whose application has moved past the `discovered` status (i.e. it's
+matched/drafted/ready/applied/interviewing/rejected/offer on `/applications`)
+gets an "In application — &lt;status&gt;" tag, is shown dimmed, and sorts to
+the end of the list — this is computed in SQL so it holds across pages, not
+just within one page.
 
 ## Sync progress indicator
 

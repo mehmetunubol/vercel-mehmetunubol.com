@@ -46,16 +46,25 @@ export async function autoMatchNewJobsForUser(userId: string) {
     .limit(MAX_AUTO_MATCHES_PER_RUN);
 
   let matched = 0;
-  for (const job of candidates) {
+  for (let i = 0; i < candidates.length; i++) {
+    const job = candidates[i]!;
     const result = await matchJobToProfile(job.title, job.company, job.rawDescription, profileData);
-    if (!result) continue;
-    await db.insert(matches).values({
-      jobId: job.id,
-      profileId: profile.id,
-      score: result.score,
-      rationale: result.rationale,
-    });
-    matched += 1;
+    if (result) {
+      await db.insert(matches).values({
+        jobId: job.id,
+        profileId: profile.id,
+        score: result.score,
+        rationale: result.rationale,
+      });
+      matched += 1;
+    }
+
+    // Firing all 8 calls back-to-back reliably blew through Gemini
+    // free-tier's requests-per-minute quota (429s from the very first
+    // sync). Space them out instead of racing them.
+    if (i < candidates.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
   }
 
   return { matched, candidatesConsidered: candidates.length };
