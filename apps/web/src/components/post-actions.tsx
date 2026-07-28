@@ -1,5 +1,6 @@
 "use client";
 
+import { Check, Download, Share2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@repo/ui";
 
@@ -26,10 +27,21 @@ export function PostActions({ title }: { title: string }) {
   return (
     <div className="flex flex-wrap gap-2 print:hidden">
       <Button variant="outline" size="sm" onClick={() => window.print()}>
-        ⬇️ Download PDF
+        <Download className="h-4 w-4" aria-hidden="true" />
+        Download PDF
       </Button>
       <Button variant="outline" size="sm" onClick={handleShare}>
-        {copied ? "✅ Link copied" : "🔗 Share"}
+        {copied ? (
+          <>
+            <Check className="h-4 w-4" aria-hidden="true" />
+            Link copied
+          </>
+        ) : (
+          <>
+            <Share2 className="h-4 w-4" aria-hidden="true" />
+            Share
+          </>
+        )}
       </Button>
     </div>
   );
