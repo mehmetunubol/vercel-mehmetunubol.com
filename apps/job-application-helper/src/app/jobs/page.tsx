@@ -698,7 +698,9 @@ export default async function JobsPage({
                     key={job.id}
                     className="flex items-center gap-2 rounded-md border border-border p-3 text-sm transition-colors hover:border-accent/40"
                   >
-                    <input type="checkbox" name="jobIds" value={job.id} className="shrink-0" />
+                    <label className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center">
+                      <input type="checkbox" name="jobIds" value={job.id} className="h-4 w-4 accent-accent" />
+                    </label>
                     <Link href={`/jobs/${job.id}`} className="flex min-w-0 flex-1 items-center justify-between gap-3">
                       <span className="min-w-0 truncate font-medium">
                         {job.title} <span className="font-normal text-muted">— {job.company}</span>

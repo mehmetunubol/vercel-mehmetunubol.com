@@ -273,7 +273,7 @@ export const site = {
     {
       name: "Job Application Helper",
       description:
-        "Personal job-search assistant — pulls postings from Greenhouse/Lever boards and aggregators, filters them against a configurable keyword list, scores matches against my CV with Gemini, drafts cover letters, and tracks every application on a kanban board. No auto-apply, by design.",
+        "Personal job-search assistant — pulls postings from Greenhouse/Lever boards, aggregators, and LinkedIn saved searches, filters them against a configurable keyword list, scores matches against my CV with Gemini, drafts cover letters, and tracks every application on a kanban board. No auto-apply, by design.",
       href: "https://jah.mehmetunubol.com/",
       tech: ["Next.js", "Drizzle", "Neon", "Gemini", "Auth.js"],
     },
