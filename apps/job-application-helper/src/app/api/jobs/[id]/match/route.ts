@@ -25,7 +25,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
 
   const profileData = profileDataSchema.parse(profile.data);
-  const result = await matchJobToProfile(job.title, job.company, job.rawDescription, profileData);
+  const result = await matchJobToProfile(job.title, job.company, job.rawDescription, profileData, job.location);
   if (!result) {
     return NextResponse.json({ error: "failed to match" }, { status: 502 });
   }

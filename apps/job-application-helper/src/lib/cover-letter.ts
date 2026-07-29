@@ -1,4 +1,4 @@
-import { GEMINI_MODEL, gemini, withGeminiRetry } from "@/lib/gemini";
+import { gemini, withGeminiRetry } from "@/lib/gemini";
 import type { ProfileData } from "@/lib/profile-schema";
 
 export async function generateCoverLetter(
@@ -7,9 +7,9 @@ export async function generateCoverLetter(
   jobDescription: string,
   profile: ProfileData,
 ): Promise<string | null> {
-  const response = await withGeminiRetry(() =>
+  const response = await withGeminiRetry((model) =>
     gemini.models.generateContent({
-      model: GEMINI_MODEL,
+      model,
       contents: [
         {
           role: "user",

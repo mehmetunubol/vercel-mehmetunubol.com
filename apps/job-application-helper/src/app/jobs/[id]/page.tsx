@@ -34,7 +34,7 @@ async function runMatch(_prevState: ActionResult | null, formData: FormData): Pr
   if (!job || !profile) return { ok: false, message: "Job or profile no longer exists." };
 
   const profileData = profileDataSchema.parse(profile.data);
-  const result = await matchJobToProfile(job.title, job.company, job.rawDescription, profileData);
+  const result = await matchJobToProfile(job.title, job.company, job.rawDescription, profileData, job.location);
   if (!result) return { ok: false, message: geminiFailureMessage() };
 
   await db.insert(matches).values({ jobId, profileId, score: result.score, rationale: result.rationale });

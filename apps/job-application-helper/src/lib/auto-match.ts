@@ -61,7 +61,7 @@ export async function autoMatchNewJobsForUser(userId: string) {
   for (const job of candidates) {
     if (isGeminiQuotaExhaustedForToday()) break; // rest of the batch would just fail too
 
-    const result = await matchJobToProfile(job.title, job.company, job.rawDescription, profileData);
+    const result = await matchJobToProfile(job.title, job.company, job.rawDescription, profileData, job.location);
     if (result) {
       await db.insert(matches).values({
         jobId: job.id,

@@ -1,13 +1,13 @@
 import { z } from "zod";
-import { GEMINI_MODEL, gemini, withGeminiRetry } from "@/lib/gemini";
+import { gemini, withGeminiRetry } from "@/lib/gemini";
 import { profileDataSchema, type ProfileData } from "@/lib/profile-schema";
 
 const responseSchema = z.toJSONSchema(profileDataSchema);
 
 export async function parseCvPdf(base64: string): Promise<ProfileData | null> {
-  const response = await withGeminiRetry(() =>
+  const response = await withGeminiRetry((model) =>
     gemini.models.generateContent({
-      model: GEMINI_MODEL,
+      model,
       contents: [
         {
           role: "user",

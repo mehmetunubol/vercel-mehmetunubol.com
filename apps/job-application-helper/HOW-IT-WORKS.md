@@ -197,30 +197,35 @@ for your latest profile, and scores up to the configured cap of them against
 your most recent CV/profile using Gemini, saving the result. Raise
 `MAX_AUTO_MATCHES_PER_RUN` above 0 to turn it back on.
 
-Gemini's free tier for `gemini-3.5-flash` is a hard **20 requests per day**
+Each Gemini free-tier model is a hard **20 requests per day**
 (confirmed from a real 429 body's `quotaId:
 GenerateRequestsPerDayPerProjectPerModel-FreeTier`) — not a per-minute
-limit. That daily budget is shared across every Gemini feature: auto-match's
-batch, manual match, cover letter drafts, and CV parsing.
+limit — and that budget is per model, not shared. The app is configured
+with a priority list of models (`GEMINI_MODELS` env var, comma-separated;
+defaults to `gemini-3.5-flash,gemini-2.5-flash,gemini-2.0-flash` if unset)
+and falls back to the next one once the current model's daily quota is hit.
 
-Every Gemini call funnels through `withGeminiRetry()` (`src/lib/gemini.ts`):
+Every Gemini call funnels through `withGeminiRetry()` (`src/lib/gemini.ts`),
+which picks the active model and passes it into the caller's callback:
 
 - Enforces a process-wide minimum 4s gap between calls regardless of which
   feature triggered them, so back-to-back actions across different parts of
   the app don't race the same quota window.
 - On a 429, checks whether it's the daily-quota error specifically. If so,
-  it does **not** retry (the `retryDelay` a daily-quota 429 reports doesn't
-  mean the daily cap actually resets that soon — retrying just fails again)
-  and instead remembers the exhaustion until the next UTC day. Every later
-  Gemini call that day — auto-match, manual match, cover letter draft, CV
-  parse — fails immediately without even hitting the API, and the auto-match
-  batch loop stops early instead of trying (and failing) the rest of its
-  candidates. `isGeminiQuotaExhaustedForToday()` lets callers show "daily
-  quota used up, try again after it resets" instead of a generic failure
-  message.
+  it does **not** retry that model (the `retryDelay` a daily-quota 429
+  reports doesn't mean the daily cap actually resets that soon — retrying
+  just fails again) and instead remembers that model's exhaustion until the
+  next UTC day, then immediately retries the same call against the next
+  configured model. `getActiveGeminiModel()` recomputes the first
+  non-exhausted model on every call (rather than sticking wherever it last
+  switched to), so a model tried again the next day is the primary one
+  first, not whatever fallback was last used. Only once every configured
+  model is exhausted does a call fail — `isGeminiQuotaExhaustedForToday()`
+  lets callers show "daily quota used up, try again after it resets"
+  instead of a generic failure message in that case.
 - Any other 429 (a genuine per-minute/transient limit) backs off using the
   API's own `retryDelay` when given, or a longer backoff than a transient
-  503/network error would get otherwise, and does retry.
+  503/network error would get otherwise, and does retry the same model.
 
 Scored jobs appear in the **"Recommended for you"** section at the top of
 `/jobs`, sorted by score.

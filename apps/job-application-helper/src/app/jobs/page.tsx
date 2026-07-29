@@ -26,6 +26,7 @@ import { runSavedSearch } from "@/lib/linkedin";
 import type { ExperienceLevel, JobType, PostedWithin, Workplace } from "@/lib/linkedin/filters";
 import { preferenceWhereClause } from "@/lib/preferences";
 import { AppShell } from "@/components/app-shell";
+import { SelectAllCheckbox } from "@/components/select-all-checkbox";
 import { SubmitButton } from "@/components/submit-button";
 
 const inputClass =
@@ -272,10 +273,14 @@ async function discardSelectedJobs(formData: FormData) {
 
   const jobIds = formData.getAll("jobIds").filter((value): value is string => typeof value === "string");
   if (jobIds.length === 0) return;
+  const includeTracked = formData.get("includeTracked") === "true";
 
-  await db.delete(jobs).where(and(inArray(jobs.id, jobIds), notTrackedClause));
+  await db
+    .delete(jobs)
+    .where(includeTracked ? inArray(jobs.id, jobIds) : and(inArray(jobs.id, jobIds), notTrackedClause));
   revalidatePath("/jobs");
   revalidatePath("/dashboard");
+  revalidatePath("/applications");
 }
 
 async function clearUnmatchedJobs() {
@@ -774,6 +779,12 @@ export default async function JobsPage({
             </p>
           ) : (
             <form action={discardSelectedJobs} className="space-y-2">
+              <div className="flex items-center gap-2 border-b border-border pb-2 text-xs text-muted">
+                <label className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center">
+                  <SelectAllCheckbox name="jobIds" />
+                </label>
+                <span>Select all on this page</span>
+              </div>
               <ul className="space-y-2">
                 {filteredJobs.map((job) => (
                   <li
@@ -790,20 +801,22 @@ export default async function JobsPage({
                         {job.title} <span className="font-normal text-muted">— {job.company}</span>
                       </span>
                       <span className="flex shrink-0 items-center gap-1.5">
-                        {job.applicationStatus ? (
-                          <Badge variant="accent" className="capitalize">
-                            In application — {job.applicationStatus}
-                          </Badge>
-                        ) : null}
+                        {job.applicationStatus ? <Badge variant="accent">Tracked</Badge> : null}
                         <Badge variant="outline">{job.source}</Badge>
                       </span>
                     </Link>
                   </li>
                 ))}
               </ul>
-              <SubmitButton size="sm" variant="outline" className="text-red-500" pendingText="Discarding…">
-                Discard selected
-              </SubmitButton>
+              <div className="flex flex-wrap items-center gap-3">
+                <SubmitButton size="sm" variant="outline" className="text-red-500" pendingText="Discarding…">
+                  Discard selected
+                </SubmitButton>
+                <label className="flex items-center gap-1.5 text-xs text-muted">
+                  <input type="checkbox" name="includeTracked" value="true" className="h-3.5 w-3.5 accent-accent" />
+                  Include tracked jobs (also deletes their application history)
+                </label>
+              </div>
             </form>
           )}
 
