@@ -3,7 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import Link from "next/link";
 import { requireUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { applications, jobs, matches, profiles, syncStatus, trackedBoards } from "@/lib/db/schema";
+import { applications, jobs, linkedinSavedSearches, matches, syncStatus, trackedBoards } from "@/lib/db/schema";
 import { AppShell } from "@/components/app-shell";
 
 function formatSyncTime(date: Date | null): string {
@@ -33,14 +33,14 @@ function syncFreshness(date: Date | null, paused: boolean): { dot: string; text:
 export default async function DashboardPage() {
   const userId = await requireUserId();
 
-  const [jobRows, applicationRows, profileRows, matchRows, boards, aggregatorSyncs] = userId
+  const [jobRows, applicationRows, matchRows, boards, aggregatorSyncs, savedSearches] = userId
     ? await Promise.all([
         db.select({ id: jobs.id }).from(jobs),
         db.select().from(applications).where(eq(applications.userId, userId)),
-        db.select().from(profiles).where(eq(profiles.userId, userId)),
         db.select().from(matches),
         db.select().from(trackedBoards).orderBy(desc(trackedBoards.createdAt)),
         db.select().from(syncStatus),
+        db.select().from(linkedinSavedSearches).orderBy(desc(linkedinSavedSearches.createdAt)),
       ])
     : [[], [], [], [], [], []];
 
@@ -61,6 +61,11 @@ export default async function DashboardPage() {
       lastSyncedAt: aggregatorSyncMap.get("aggregator:arbeitnow") ?? null,
       paused: false,
     },
+    ...savedSearches.map((search) => ({
+      label: `${search.name} (LinkedIn)`,
+      lastSyncedAt: search.lastRunAt,
+      paused: !search.active,
+    })),
   ];
 
   const activeApplications = applicationRows.filter(
@@ -70,7 +75,6 @@ export default async function DashboardPage() {
   const stats = [
     { label: "Tracked jobs", value: jobRows.length },
     { label: "Active applications", value: activeApplications },
-    { label: "Profiles saved", value: profileRows.length },
     { label: "Matches scored", value: matchRows.length },
   ];
 
@@ -84,7 +88,7 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-3 gap-3">
           {stats.map((stat) => (
             <Card
               key={stat.label}

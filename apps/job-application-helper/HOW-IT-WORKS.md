@@ -202,7 +202,8 @@ Each Gemini free-tier model is a hard **20 requests per day**
 GenerateRequestsPerDayPerProjectPerModel-FreeTier`) — not a per-minute
 limit — and that budget is per model, not shared. The app is configured
 with a priority list of models (`GEMINI_MODELS` env var, comma-separated;
-defaults to `gemini-3.5-flash,gemini-2.5-flash,gemini-2.0-flash` if unset)
+defaults to `gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite` if
+unset)
 and falls back to the next one once the current model's daily quota is hit.
 
 Every Gemini call funnels through `withGeminiRetry()` (`src/lib/gemini.ts`),

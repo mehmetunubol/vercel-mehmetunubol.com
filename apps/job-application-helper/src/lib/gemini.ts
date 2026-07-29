@@ -7,7 +7,12 @@ export const gemini = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 // exhausted, calls fall back to the next one instead of failing outright.
 // Override with GEMINI_MODELS="model-a,model-b" (comma-separated, priority
 // first) without a code change or redeploy of this file.
-const DEFAULT_MODELS = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
+// Checked against ai.google.dev/gemini-api/docs/models and /pricing
+// (2026-07-29): gemini-2.5-flash/2.5-flash-lite/2.5-pro are 404ing for many
+// callers ahead of their official Oct 16 2026 shutdown date, and
+// gemini-2.0-flash was already shut down June 1 2026 — both dropped. The
+// three below are all current, active, and confirmed on the free tier.
+const DEFAULT_MODELS = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
 
 function configuredModels(): string[] {
   const raw = process.env.GEMINI_MODELS;
