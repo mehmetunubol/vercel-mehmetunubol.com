@@ -22,9 +22,10 @@ import {
   trackedBoards,
 } from "@/lib/db/schema";
 import { recordSyncStatus, upsertJobs } from "@/lib/jobs";
-import { runSavedSearch } from "@/lib/linkedin";
+import { BlockedError, RateLimitError, runSavedSearch } from "@/lib/linkedin";
 import type { ExperienceLevel, JobType, PostedWithin, Workplace } from "@/lib/linkedin/filters";
 import { preferenceWhereClause } from "@/lib/preferences";
+import { ActionForm, type ActionResult } from "@/components/action-form";
 import { AppShell } from "@/components/app-shell";
 import { SelectAllCheckbox } from "@/components/select-all-checkbox";
 import { SubmitButton } from "@/components/submit-button";
@@ -223,30 +224,52 @@ async function addSavedSearch(formData: FormData) {
   revalidatePath("/jobs");
 }
 
-async function runSavedSearchAction(formData: FormData) {
+async function runSavedSearchAction(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
   "use server";
   const userId = await requireUserId();
-  if (!userId) return;
+  if (!userId) return { ok: false, message: "Not signed in." };
 
   const searchId = formData.get("searchId");
-  if (typeof searchId !== "string") return;
+  if (typeof searchId !== "string") return { ok: false, message: "Missing search id." };
 
   const [savedSearch] = await db
     .select()
     .from(linkedinSavedSearches)
     .where(eq(linkedinSavedSearches.id, searchId))
     .limit(1);
-  if (!savedSearch) return;
+  if (!savedSearch) return { ok: false, message: "Saved search not found." };
 
-  const normalized = await runSavedSearch(savedSearch);
-  await upsertJobs(normalized);
-  await db
-    .update(linkedinSavedSearches)
-    .set({ lastRunAt: new Date() })
-    .where(eq(linkedinSavedSearches.id, searchId));
-  await autoMatchNewJobsForUser(userId);
-  revalidatePath("/jobs");
-  revalidatePath("/dashboard");
+  try {
+    const normalized = await runSavedSearch(savedSearch);
+    await upsertJobs(normalized);
+    await db
+      .update(linkedinSavedSearches)
+      .set({ lastRunAt: new Date() })
+      .where(eq(linkedinSavedSearches.id, searchId));
+    await autoMatchNewJobsForUser(userId);
+    revalidatePath("/jobs");
+    revalidatePath("/dashboard");
+
+    if (normalized.length === 0) {
+      return {
+        ok: false,
+        message: "Ran with no errors but found 0 new postings — either genuinely none matched, or all were already tracked.",
+      };
+    }
+    return { ok: true };
+  } catch (error) {
+    // Previously unhandled: this threw straight out of the server action
+    // with no message shown, so a rate-limit/block just looked like "Run"
+    // silently did nothing and the dashboard's job count never moved.
+    if (error instanceof RateLimitError) {
+      return { ok: false, message: "LinkedIn rate-limited this request (HTTP 429) — wait a while before running again." };
+    }
+    if (error instanceof BlockedError) {
+      return { ok: false, message: "LinkedIn responded with what looks like a soft block, not real results — try again later." };
+    }
+    console.error("LinkedIn saved search run failed:", error);
+    return { ok: false, message: "Search run failed unexpectedly — check server logs." };
+  }
 }
 
 async function deleteSavedSearch(formData: FormData) {
@@ -620,7 +643,7 @@ export default async function JobsPage({
                 {savedSearches.map((search) => (
                   <li
                     key={search.id}
-                    className="flex items-center justify-between gap-2 rounded-md border border-border p-2 text-sm"
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border p-2 text-sm"
                   >
                     <span className="min-w-0 truncate">
                       {search.name}{" "}
@@ -635,12 +658,15 @@ export default async function JobsPage({
                       ) : null}
                     </span>
                     <div className="flex shrink-0 items-center gap-2">
-                      <form action={runSavedSearchAction}>
-                        <input type="hidden" name="searchId" value={search.id} />
-                        <SubmitButton size="sm" variant="outline" pendingText="Running…">
-                          Run
-                        </SubmitButton>
-                      </form>
+                      <ActionForm
+                        action={runSavedSearchAction}
+                        hiddenFields={{ searchId: search.id }}
+                        submitLabel="Run"
+                        pendingText="Running…"
+                        variant="outline"
+                        size="sm"
+                        className="inline-flex flex-wrap items-center gap-2"
+                      />
                       <form action={toggleSavedSearchAutoSync}>
                         <input type="hidden" name="searchId" value={search.id} />
                         <input type="hidden" name="active" value={search.active ? "false" : "true"} />

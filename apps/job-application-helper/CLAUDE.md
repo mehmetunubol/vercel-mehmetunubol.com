@@ -35,3 +35,20 @@ every change. No rationale/history there by design; this file has that.
   separate API key, and normalizing its response shape to match what
   `matching.ts`/`cv-parser.ts`/`cover-letter.ts` expect — bigger lift than
   the same-provider model switching in `src/lib/gemini.ts`.
+- **Auto-apply (Greenhouse/Lever)** was scoped and explicitly declined by
+  the user after exploration. Blockers found, if revisited:
+  - No CV file bytes are stored anywhere — only Gemini-parsed structured
+    JSON (`profiles.data`). Real submission needs the actual PDF.
+  - Nothing captures the ATS-specific data a submission needs (Greenhouse
+    board token / Lever posting-application fields) — `jobs` and
+    `trackedBoards` only keep `externalId`/`url`.
+  - Greenhouse's public Job Board API is documented as read-only
+    (listings only); there's no officially documented endpoint for
+    third-party automated submission — the same ToS-grey-zone risk this
+    app otherwise avoids. Lever does publish a documented Postings API
+    apply endpoint, so it's on firmer footing if this is revisited.
+  - The public landing page (`src/app/page.tsx`) currently states "No
+    auto-apply... a human applies" — building this would require
+    updating that copy.
+  - `applicationStatusEnum`'s `ready` and `applied` values are currently
+    unused by any code path.
