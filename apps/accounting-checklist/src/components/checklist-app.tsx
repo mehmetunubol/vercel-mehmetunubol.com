@@ -44,8 +44,9 @@ export function ChecklistApp() {
   useEffect(() => {
     if (checklist !== "payments") return;
     fetch(`/api/state?checklist=invoices`)
-      .then((res) => res.json())
-      .then(setInvoicesState);
+      .then((res) => (res.ok ? res.json() : null))
+      .then(setInvoicesState)
+      .catch(() => setInvoicesState(null));
   }, [checklist, month]);
 
   function selectChecklist(key: ChecklistKey) {
@@ -232,7 +233,7 @@ export function ChecklistApp() {
 
   const allDone = doneCount === items.length;
 
-  const invoicesMonthState = invoicesState?.months[month];
+  const invoicesMonthState = invoicesState?.months?.[month];
   const incomingEuro = invoicesMonthState?.fields.euro;
   const incomingTry = invoicesMonthState?.fields.tlKarsiligi;
   const incomingRate = invoicesMonthState?.fields.alisKur;
