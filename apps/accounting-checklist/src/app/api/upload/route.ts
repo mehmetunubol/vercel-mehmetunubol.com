@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getDriveAccessToken } from "@/lib/auth";
-import { getOrCreateRootFolder, getOrCreateMonthFolder, uploadFile } from "@/lib/drive";
+import { getOrCreateChecklistFolder, getOrCreateMonthFolder, uploadFile } from "@/lib/drive";
+import { isChecklistKey } from "@/lib/checklist";
 
 export async function POST(req: NextRequest) {
   const accessToken = await getDriveAccessToken(req);
@@ -9,13 +10,14 @@ export async function POST(req: NextRequest) {
   const formData = await req.formData();
   const file = formData.get("file");
   const month = formData.get("month");
+  const checklist = formData.get("checklist");
 
-  if (!(file instanceof File) || typeof month !== "string") {
-    return NextResponse.json({ error: "missing file or month" }, { status: 400 });
+  if (!(file instanceof File) || typeof month !== "string" || !isChecklistKey(checklist)) {
+    return NextResponse.json({ error: "missing file, month, or checklist" }, { status: 400 });
   }
 
-  const rootFolderId = await getOrCreateRootFolder(accessToken);
-  const monthFolderId = await getOrCreateMonthFolder(accessToken, rootFolderId, month);
+  const folderId = await getOrCreateChecklistFolder(accessToken, checklist);
+  const monthFolderId = await getOrCreateMonthFolder(accessToken, folderId, month);
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const uploaded = await uploadFile(

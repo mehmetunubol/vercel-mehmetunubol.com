@@ -23,7 +23,7 @@ vi.mock("googleapis", () => ({
   },
 }));
 
-const { getOrCreateRootFolder, readState, writeState } = await import("@/lib/drive");
+const { getOrCreateChecklistFolder, readState, writeState } = await import("@/lib/drive");
 
 beforeEach(() => {
   filesList.mockReset();
@@ -32,20 +32,24 @@ beforeEach(() => {
   filesGet.mockReset();
 });
 
-describe("getOrCreateRootFolder", () => {
-  it("returns the existing folder id when found", async () => {
-    filesList.mockResolvedValue({ data: { files: [{ id: "existing-id" }] } });
-    const id = await getOrCreateRootFolder("token");
-    expect(id).toBe("existing-id");
+describe("getOrCreateChecklistFolder", () => {
+  it("returns the existing nested folder id when both parent and child exist", async () => {
+    filesList
+      .mockResolvedValueOnce({ data: { files: [{ id: "parent-id" }] } })
+      .mockResolvedValueOnce({ data: { files: [{ id: "child-id" }] } });
+    const id = await getOrCreateChecklistFolder("token", "invoices");
+    expect(id).toBe("child-id");
     expect(filesCreate).not.toHaveBeenCalled();
   });
 
-  it("creates the folder when not found", async () => {
+  it("creates parent and child folders when neither exist", async () => {
     filesList.mockResolvedValue({ data: { files: [] } });
-    filesCreate.mockResolvedValue({ data: { id: "new-id" } });
-    const id = await getOrCreateRootFolder("token");
-    expect(id).toBe("new-id");
-    expect(filesCreate).toHaveBeenCalledOnce();
+    filesCreate
+      .mockResolvedValueOnce({ data: { id: "parent-id" } })
+      .mockResolvedValueOnce({ data: { id: "child-id" } });
+    const id = await getOrCreateChecklistFolder("token", "payments");
+    expect(id).toBe("child-id");
+    expect(filesCreate).toHaveBeenCalledTimes(2);
   });
 });
 

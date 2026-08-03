@@ -4,15 +4,15 @@
 /* Compile Tailwind classes used by the shared UI package (JIT source). */
 @source "../../../../packages/ui/src";
 
-/* App brand: amber accent, distinct from other apps, per the
-   "apps are independent" convention (see repo README). */
+/* App brand: finance-green accent (profit/done semantics), distinct from
+   other apps, per the "apps are independent" convention (see repo README). */
 :root {
-  --color-accent: oklch(0.72 0.15 70);
-  --color-accent-foreground: oklch(0.16 0.02 258);
+  --color-accent: oklch(0.6 0.14 162);
+  --color-accent-foreground: oklch(0.99 0 0);
 }
 
 .dark {
-  --color-accent: oklch(0.78 0.14 70);
+  --color-accent: oklch(0.72 0.16 162);
   --color-accent-foreground: oklch(0.16 0.02 258);
 }
 
