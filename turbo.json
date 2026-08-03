@@ -13,7 +13,10 @@
         "PROFILE_API_SECRET",
         "GEMINI_API_KEY",
         "CRON_SECRET",
-        "APPS_WEB_URL"
+        "APPS_WEB_URL",
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "ALLOWED_EMAIL"
       ]
     },
     "dev": {

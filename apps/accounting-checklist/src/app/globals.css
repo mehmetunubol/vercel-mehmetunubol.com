@@ -1,0 +1,35 @@
+@import "tailwindcss";
+@import "@repo/config/tailwind";
+
+/* Compile Tailwind classes used by the shared UI package (JIT source). */
+@source "../../../../packages/ui/src";
+
+/* App brand: amber accent, distinct from other apps, per the
+   "apps are independent" convention (see repo README). */
+:root {
+  --color-accent: oklch(0.72 0.15 70);
+  --color-accent-foreground: oklch(0.16 0.02 258);
+}
+
+.dark {
+  --color-accent: oklch(0.78 0.14 70);
+  --color-accent-foreground: oklch(0.16 0.02 258);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+}
