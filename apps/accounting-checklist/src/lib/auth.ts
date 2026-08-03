@@ -91,6 +91,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 // bypasses the `session` callback entirely, so this never leaks to the
 // client. Route handlers use this to authenticate Drive API calls.
 export async function getDriveAccessToken(req: NextRequest): Promise<string | null> {
-  const token = await getToken({ req, secret: process.env.AUTH_SECRET });
+  // getToken()'s auto-detection of the `__Secure-` cookie prefix (based on
+  // request protocol) is unreliable in Vercel serverless Route Handlers —
+  // pass it explicitly instead of letting it guess, or it silently returns
+  // null (looking for the wrong cookie name) on custom production domains.
+  const token = await getToken({
+    req,
+    secret: process.env.AUTH_SECRET,
+    secureCookie: process.env.NODE_ENV === "production",
+  });
   return token?.accessToken ?? null;
 }
