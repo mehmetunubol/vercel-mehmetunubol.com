@@ -3,7 +3,7 @@ import { signIn } from "@/lib/auth";
 
 async function login() {
   "use server";
-  await signIn("google", { redirectTo: "/" });
+  await signIn("google", { redirectTo: "/dashboard" });
 }
 
 export default async function LoginPage({

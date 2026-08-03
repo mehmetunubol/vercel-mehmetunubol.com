@@ -278,6 +278,12 @@ export const site = {
       tech: ["Next.js", "Drizzle", "Neon", "Gemini", "Auth.js"],
     },
     {
+      name: "Accounting Checklist",
+      description:
+        "Personal monthly bookkeeping tool — recurring checklists with configurable per-field defaults, receipt uploads, and a one-click printable monthly summary. No database — every value and file lives in my own Google Drive.",
+      tech: ["Next.js", "NextAuth", "Google Drive API"],
+    },
+    {
       name: "Petsitter",
       description:
         "Marketplace connecting pet owners with sitters — React frontend, Node.js microservices in a monorepo, Angular admin, and a Go event manager. Deployed on Google Cloud Run with the frontend on Vercel.",
