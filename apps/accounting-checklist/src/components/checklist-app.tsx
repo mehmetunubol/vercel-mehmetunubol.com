@@ -235,7 +235,7 @@ export function ChecklistApp() {
 
   const invoicesMonthState = invoicesState?.months?.[month];
   const incomingEuro = invoicesMonthState?.fields.euro;
-  const incomingTry = invoicesMonthState?.fields.tlKarsiligi;
+  const incomingTry = invoicesMonthState?.fields.bankAmount;
   const incomingRate = invoicesMonthState?.fields.alisKur;
   const outgoingTotal = computeItemsTotal(items, monthState, defaults, month);
   const netAmount = (Number(incomingTry) || 0) - outgoingTotal;

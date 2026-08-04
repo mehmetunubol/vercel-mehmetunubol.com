@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     const invoicesState = await readState(accessToken, invoicesFolderId);
     const invoicesMonthState = invoicesState.months[month];
     const outgoingTotal = computeItemsTotal(CHECKLISTS.payments.items, monthState, defaults, month);
-    const incomingTry = invoicesMonthState?.fields.tlKarsiligi;
+    const incomingTry = invoicesMonthState?.fields.bankAmount;
     totals = {
       incomingEuro: invoicesMonthState?.fields.euro,
       incomingTry,
