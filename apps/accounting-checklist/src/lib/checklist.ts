@@ -73,7 +73,10 @@ const INVOICE_ITEMS: ChecklistItemDef[] = [
     index: 5,
     title: "Send to bank",
     icon: "bank",
-    fields: [],
+    fields: [
+      { key: "bankAmount", label: "Amount sent", type: "number" },
+      { key: "bankSentDate", label: "Date sent", type: "date" },
+    ],
     hasFile: true,
     fileLabel: "Bank receipt (dekont)",
   },
