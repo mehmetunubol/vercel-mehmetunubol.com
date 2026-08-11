@@ -23,8 +23,28 @@ function getServerSnapshot(): boolean {
   return false;
 }
 
-function subscribe(): () => void {
-  return () => {};
+const RESIZE_DEBOUNCE_MS = 200;
+
+function subscribe(callback: () => void): () => void {
+  const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+  media.addEventListener("change", callback);
+
+  // Debounced: a live window drag fires `resize` continuously, and
+  // re-evaluating (and possibly mounting/unmounting the WebGL canvas) on
+  // every single event mid-drag causes a visible flicker. Only react once
+  // the width has settled.
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const onResize = () => {
+    clearTimeout(timeout);
+    timeout = setTimeout(callback, RESIZE_DEBOUNCE_MS);
+  };
+  window.addEventListener("resize", onResize);
+
+  return () => {
+    media.removeEventListener("change", callback);
+    window.removeEventListener("resize", onResize);
+    clearTimeout(timeout);
+  };
 }
 
 /**

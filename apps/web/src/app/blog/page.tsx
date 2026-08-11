@@ -14,7 +14,7 @@ export const metadata = {
 export default function BlogIndexPage() {
   const posts = getAllPosts();
   const categories = getCategories();
-  const [featured, ...rest] = posts;
+  const featured = posts[0];
   const featuredColor = featured ? getCategoryColor(featured.category) : null;
 
   const sectionIds = categories.map(({ category }) => category);
@@ -98,7 +98,11 @@ export default function BlogIndexPage() {
                   homepage uses to drive the morphing background per section. */}
               <div className="flex flex-col gap-14">
                 {categories.map(({ category, label }) => {
-                  const categoryPosts = rest.filter((post) => post.category === category);
+                  // Use `posts` (not `rest`) so a category whose only post
+                  // is the featured one still gets a real section — its
+                  // chip's anchor link would otherwise point at a section
+                  // that never rendered.
+                  const categoryPosts = posts.filter((post) => post.category === category);
                   if (categoryPosts.length === 0) return null;
                   const color = getCategoryColor(category);
                   return (
