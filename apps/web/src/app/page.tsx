@@ -4,6 +4,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SectionHeading } from "@/components/section-heading";
 import { RotatingWord } from "@/components/rotating-word";
 import { CurrentFocusCard } from "@/components/current-focus-card";
+import { SiteBackground } from "@/components/site-background";
 import { site } from "@/lib/site";
 import { getSkillUsage, isActiveSkill } from "@/lib/skill-usage";
 
@@ -11,15 +12,17 @@ const HERO_ROLES = [site.title, ...site.skills] as const;
 
 export default function Home() {
   return (
-    <Shell header={<SiteHeader />} footer={<SiteFooter />}>
-      <div className="flex flex-col gap-28 sm:gap-36">
-        <HeroSection />
-        <ExperienceSection />
-        <SkillsSection />
-        <ProjectsSection />
-        <ContactSection />
-      </div>
-    </Shell>
+    <SiteBackground>
+      <Shell className="bg-transparent" header={<SiteHeader />} footer={<SiteFooter />}>
+        <div className="flex flex-col gap-28 sm:gap-36">
+          <HeroSection />
+          <ExperienceSection />
+          <SkillsSection />
+          <ProjectsSection />
+          <ContactSection />
+        </div>
+      </Shell>
+    </SiteBackground>
   );
 }
 
