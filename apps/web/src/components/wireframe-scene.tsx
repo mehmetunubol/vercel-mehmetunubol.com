@@ -8,8 +8,11 @@ import { useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
-export const FORMATIONS = ["about", "experience", "skills", "projects", "contact"] as const;
-export type Formation = (typeof FORMATIONS)[number];
+// Formation key is any string — section ids on the homepage, category ids
+// on the blog index — rather than a fixed union, so pages with a different
+// or dynamic set of sections (e.g. blog categories) can drive the same
+// morphing background.
+export type Formation = string;
 
 interface Profile {
   amplitude: number;
@@ -23,13 +26,31 @@ interface Profile {
 // profile's `scale` multiplies on top of that base.
 const BASE_SCALE: [number, number, number] = [1.35, 1.05, 1.1];
 
-const PROFILES: Record<Formation, Profile> = {
-  about: { amplitude: 0.22, frequency: 2.2, scale: [1, 1, 1], rotationSpeed: 0.1 },
-  experience: { amplitude: 0.16, frequency: 2.8, scale: [0.85, 1.25, 0.85], rotationSpeed: 0.07 },
-  skills: { amplitude: 0.3, frequency: 4.2, scale: [1.05, 1.05, 1.05], rotationSpeed: 0.16 },
-  projects: { amplitude: 0.24, frequency: 1.8, scale: [1.2, 1.2, 1.2], rotationSpeed: 0.05 },
-  contact: { amplitude: 0.03, frequency: 1.4, scale: [0.75, 0.75, 0.75], rotationSpeed: 0.25 },
-};
+function hashKey(key: string): number {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) {
+    h = (h * 31 + key.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+// Deterministically derive a profile from an arbitrary string key, so any
+// formation name (not just a fixed known set) gets a distinct, stable
+// wobble/scale/rotation "personality" every time it comes up.
+function profileForKey(key: string): Profile {
+  const h = hashKey(key);
+  const amplitude = 0.14 + ((h % 100) / 100) * 0.35;
+  const frequency = 1.2 + (((h >> 4) % 100) / 100) * 3.2;
+  const scaleBase = 0.75 + (((h >> 8) % 100) / 100) * 0.65;
+  const stretch = 0.8 + (((h >> 12) % 100) / 100) * 0.6;
+  const rotationSpeed = 0.05 + (((h >> 16) % 100) / 100) * 0.22;
+  return {
+    amplitude,
+    frequency,
+    scale: [scaleBase, scaleBase * stretch, scaleBase],
+    rotationSpeed,
+  };
+}
 
 const DAMPING = 0.03;
 const SYNAPSE_COUNT = 26;
@@ -166,7 +187,7 @@ function WireframeSolid({ activeFormation }: { activeFormation: Formation }) {
   const { viewport, pointer } = useThree();
 
   useFrame((state, delta) => {
-    const target = PROFILES[activeFormation];
+    const target = profileForKey(activeFormation);
     current.current.amplitude += (target.amplitude - current.current.amplitude) * DAMPING;
     current.current.frequency += (target.frequency - current.current.frequency) * DAMPING;
     current.current.rotationSpeed +=

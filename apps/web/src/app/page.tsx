@@ -12,7 +12,7 @@ const HERO_ROLES = [site.title, ...site.skills] as const;
 
 export default function Home() {
   return (
-    <SiteBackground>
+    <SiteBackground sectionIds={["about", "experience", "skills", "projects", "contact"]}>
       <Shell className="bg-transparent" header={<SiteHeader />} footer={<SiteFooter />}>
         <div className="flex flex-col gap-28 sm:gap-36">
           <HeroSection />

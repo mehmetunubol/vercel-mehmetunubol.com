@@ -31,7 +31,7 @@ export function PostCardMotion({
       className="h-full"
     >
       <Link href={href} className="block h-full">
-        <div className="glass flex h-full flex-col rounded-lg shadow-card transition-shadow duration-300 hover:glow-ring">
+        <div className="flex h-full flex-col rounded-lg border border-border bg-surface shadow-card transition-colors duration-300 hover:border-accent/40">
           <CardHeader className="flex flex-col gap-2">
             {showCategory ? (
               <span
