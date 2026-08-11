@@ -3,7 +3,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { SectionHeading } from "@/components/section-heading";
 import { RotatingWord } from "@/components/rotating-word";
-import { CodeCard } from "@/components/code-card";
+import { CurrentFocusCard } from "@/components/current-focus-card";
 import { site } from "@/lib/site";
 import { getSkillUsage, isActiveSkill } from "@/lib/skill-usage";
 
@@ -34,7 +34,7 @@ function HeroSection() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
               </span>
-              Available for opportunities
+              {site.availability.split(" · ")[0]}
             </Badge>
           </Reveal>
 
@@ -103,7 +103,7 @@ function HeroSection() {
         </div>
 
         <Reveal delayMs={200} className="min-w-0 w-full lg:justify-self-end">
-          <CodeCard />
+          <CurrentFocusCard />
         </Reveal>
       </div>
     </section>
@@ -205,7 +205,7 @@ function SkillsSection() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {site.skillGroups.map((group, index) => (
           <Reveal key={group.label} delayMs={index * 50}>
-            <div className="glass group flex h-full flex-col gap-3 rounded-lg p-5 transition-shadow duration-300 hover:glow-ring">
+            <div className="group flex h-full flex-col gap-3 rounded-lg border border-border bg-surface p-5">
               <h3 className="font-mono text-xs uppercase tracking-widest text-accent">
                 {group.label}
               </h3>
@@ -219,7 +219,7 @@ function SkillsSection() {
                         className={cn(
                           "rounded-md border px-2 py-1 text-xs transition-colors group-hover:text-foreground",
                           active
-                            ? "border-accent/50 bg-accent/10 font-medium text-accent"
+                            ? "border-accent-2/50 bg-accent-2/10 font-medium text-accent-2"
                             : "border-border text-muted",
                         )}
                       >
@@ -252,7 +252,7 @@ function SkillsSection() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Reveal>
-          <div className="glass h-full rounded-lg transition-shadow duration-300 hover:glow-ring">
+          <div className="h-full rounded-lg border border-border bg-surface">
             <div className="flex flex-col gap-5 p-6">
               <h3 className="font-mono text-xs uppercase tracking-widest text-accent">Education</h3>
               <div className="flex flex-col gap-5">
@@ -272,7 +272,7 @@ function SkillsSection() {
         </Reveal>
 
         <Reveal delayMs={120}>
-          <div className="glass h-full rounded-lg transition-shadow duration-300 hover:glow-ring">
+          <div className="h-full rounded-lg border border-border bg-surface">
             <div className="flex flex-col gap-5 p-6">
               <h3 className="font-mono text-xs uppercase tracking-widest text-accent">
                 Certifications
@@ -358,23 +358,14 @@ function ContactSection() {
   return (
     <section id="contact" className="scroll-mt-24">
       <Reveal>
-        <div className="glass relative overflow-hidden rounded-2xl p-8 sm:p-12">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 animate-pulse rounded-full bg-accent/25 blur-3xl motion-reduce:animate-none"
-          />
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-accent/15 blur-3xl"
-          />
-          <div className="relative flex flex-col gap-4">
+        <div className="rounded-2xl border border-border bg-surface p-8 sm:p-12">
+          <div className="flex flex-col gap-4">
             <span className="font-mono text-xs text-accent">04 / contact</span>
             <h2 className="max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">
-              Let&rsquo;s build something reliable.
+              Get in touch.
             </h2>
             <p className="max-w-xl text-lg text-muted">
-              Open to back-end and full-stack roles, collaborations, and interesting problems. The
-              fastest way to reach me is email.
+              Open to back-end and full-stack roles. Email is the fastest way to reach me.
             </p>
             <div className="flex flex-wrap items-center gap-3 pt-3">
               <a

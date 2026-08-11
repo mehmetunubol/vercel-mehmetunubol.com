@@ -7,18 +7,27 @@
 
 /* Map the app's next/font variables onto the shared font tokens. */
 @theme inline {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-sans: var(--font-sans-app), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono-app), ui-monospace, monospace;
 }
 
-/* App brand: extend the shared preset with an engineer-flavored palette. */
+/* App brand: extend the shared preset with an engineer-flavored palette.
+   Two accent hues on purpose — a warm primary for interactive elements,
+   a cool secondary for a handful of specific call-outs — so the page
+   doesn't collapse into a single-hue palette. Registered here (not in the
+   shared preset) since only this app uses the second hue. */
+@theme {
+  --color-accent-2: oklch(0.56 0.09 230);
+}
+
 :root {
-  --color-accent: oklch(0.55 0.2 264);
-  --color-accent-foreground: oklch(0.98 0 0);
+  --color-accent: oklch(0.62 0.16 55);
+  --color-accent-foreground: oklch(0.16 0.02 60);
+  --color-accent-2: oklch(0.56 0.09 230);
   --color-surface: oklch(1 0 0);
   --color-surface-2: oklch(0.98 0.002 286);
   --grid-line: color-mix(in srgb, var(--color-foreground) 6%, transparent);
-  --glow: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  --glow: color-mix(in srgb, var(--color-accent) 22%, transparent);
 }
 
 .dark {
@@ -26,12 +35,13 @@
   --color-foreground: oklch(0.97 0.004 258);
   --color-muted: oklch(0.66 0.02 258);
   --color-border: oklch(0.31 0.02 262);
-  --color-accent: oklch(0.72 0.14 244);
-  --color-accent-foreground: oklch(0.16 0.02 258);
+  --color-accent: oklch(0.74 0.15 60);
+  --color-accent-foreground: oklch(0.16 0.02 60);
+  --color-accent-2: oklch(0.72 0.09 224);
   --color-surface: oklch(0.24 0.006 260);
   --color-surface-2: oklch(0.28 0.007 262);
   --grid-line: color-mix(in srgb, var(--color-foreground) 8%, transparent);
-  --glow: color-mix(in srgb, var(--color-accent) 36%, transparent);
+  --glow: color-mix(in srgb, var(--color-accent) 26%, transparent);
 }
 
 @layer base {
@@ -78,7 +88,7 @@
       radial-gradient(50rem 30rem at 50% -8rem, var(--glow), transparent 70%),
       radial-gradient(36rem 24rem at 100% 8rem, var(--glow), transparent 75%),
       radial-gradient(30rem 22rem at 0% 60%, var(--glow), transparent 75%);
-    opacity: 0.85;
+    opacity: 0.7;
     animation: glow-drift 20s ease-in-out infinite;
   }
 
