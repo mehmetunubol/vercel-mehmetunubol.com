@@ -216,6 +216,11 @@ const monthStateSchema = z.object({
   customExpenses: z.array(customExpenseSchema).default([]),
   creditCards: z.array(customExpenseSchema).default([]),
   summary: z.object({ fileId: z.string(), webViewLink: z.string() }).optional(),
+  // Keys set by the automated Gmail-attachment trigger, not typed by hand —
+  // field keys as-is (e.g. "maliMusavirAmount"), repeatable entries as
+  // "<repeatableKey>:<id>" (e.g. "creditCards:card-denizbank"). Cleared for a
+  // key the moment the user edits it manually, so the badge never lies.
+  autoFilled: z.array(z.string()).default([]),
 });
 
 export const checklistStateSchema = z.object({
@@ -229,7 +234,7 @@ export type CustomExpense = z.infer<typeof customExpenseSchema>;
 export const EMPTY_STATE: ChecklistState = { months: {} };
 
 export function emptyMonthState(): MonthState {
-  return { items: {}, fields: {}, files: [], customExpenses: [], creditCards: [] };
+  return { items: {}, fields: {}, files: [], customExpenses: [], creditCards: [], autoFilled: [] };
 }
 
 export function currentMonthKey(now = new Date()): string {

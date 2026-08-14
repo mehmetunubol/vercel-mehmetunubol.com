@@ -83,6 +83,17 @@ function PlusIcon() {
   );
 }
 
+function AutoFilledBadge() {
+  return (
+    <span
+      title="Filled automatically from an email attachment"
+      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent/10 px-1.5 py-0.5 text-[0.65rem] font-medium leading-none text-accent"
+    >
+      Auto
+    </span>
+  );
+}
+
 export function ChecklistItem({
   def,
   monthState,
@@ -185,7 +196,10 @@ export function ChecklistItem({
         <CardContent className="grid gap-3 p-4 pt-0 sm:grid-cols-2 sm:p-5 sm:pt-0">
           {def.fields.map((field) => (
             <div key={field.key} className="space-y-1.5">
-              <label className="text-xs font-medium text-muted">{field.label}</label>
+              <label className="flex items-center gap-1.5 text-xs font-medium text-muted">
+                {field.label}
+                {monthState.autoFilled.includes(field.key) ? <AutoFilledBadge /> : null}
+              </label>
               <input
                 type={field.type}
                 value={
@@ -202,8 +216,10 @@ export function ChecklistItem({
             <div className="space-y-2 sm:col-span-2">
               {entries.map((entry) => {
                 const isReal = realEntries.some((e) => e.id === entry.id);
+                const isAutoFilled = monthState.autoFilled.includes(`${repeatableKey}:${entry.id}`);
                 return (
                   <div key={entry.id} className="flex flex-wrap items-center gap-2">
+                    {isAutoFilled ? <AutoFilledBadge /> : null}
                     <button
                       type="button"
                       onClick={() => onEntryChange(repeatableKey, entry.id, { done: !entry.done })}

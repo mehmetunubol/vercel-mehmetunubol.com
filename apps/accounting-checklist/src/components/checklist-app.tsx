@@ -151,7 +151,11 @@ export function ChecklistApp() {
   }
 
   function handleFieldChange(key: string, value: string) {
-    updateMonthState((prev) => ({ ...prev, fields: { ...prev.fields, [key]: value } }));
+    updateMonthState((prev) => ({
+      ...prev,
+      fields: { ...prev.fields, [key]: value },
+      autoFilled: prev.autoFilled.filter((k) => k !== key),
+    }));
   }
 
   async function handleUpload(index: number, file: File) {
@@ -203,7 +207,7 @@ export function ChecklistApp() {
               ...patch,
             },
           ];
-      return { ...prev, [key]: list };
+      return { ...prev, [key]: list, autoFilled: prev.autoFilled.filter((k) => k !== `${key}:${id}`) };
     });
   }
 
