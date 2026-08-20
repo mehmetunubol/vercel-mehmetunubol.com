@@ -278,15 +278,35 @@ function SkillsSection() {
           <div className="h-full rounded-lg border border-border bg-surface">
             <div className="flex flex-col gap-5 p-6">
               <h3 className="font-mono text-xs uppercase tracking-widest text-accent">
-                Certifications
+                Certificates
               </h3>
-              <ul className="flex flex-col gap-3 text-sm text-muted">
-                {site.certifications.map((cert) => (
-                  <li key={cert} className="flex gap-2.5">
-                    <span aria-hidden className="mt-1 text-accent">
-                      &#9656;
+              <ul className="flex flex-col gap-4 text-sm text-muted">
+                {site.certificates.map((cert) => (
+                  <li key={cert.credentialUrl} className="flex flex-col gap-1">
+                    <span className="text-foreground">{cert.name}</span>
+                    <span className="font-mono text-xs text-muted">
+                      {cert.issuer} · {cert.date}
                     </span>
-                    <span>{cert}</span>
+                    <span className="flex gap-3 pt-1 text-xs">
+                      <a
+                        href={cert.credentialUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-accent-2 hover:underline"
+                      >
+                        Verify credential
+                      </a>
+                      {cert.pdf ? (
+                        <a
+                          href={cert.pdf}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-accent-2 hover:underline"
+                        >
+                          View PDF
+                        </a>
+                      ) : null}
+                    </span>
                   </li>
                 ))}
               </ul>

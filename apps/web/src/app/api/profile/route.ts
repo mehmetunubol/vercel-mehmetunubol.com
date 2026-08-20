@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     education,
     projects,
     languages,
-    certifications,
+    certificates,
   } = site;
 
   return NextResponse.json(
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
       education,
       projects,
       languages,
-      certifications,
+      certificates,
     },
     { headers: { "Cache-Control": "no-store" } },
   );

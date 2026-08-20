@@ -163,8 +163,16 @@ function buildDocx(): Document {
     sectionHeadingParagraph("Certifications & Languages")
   );
 
-  for (const cert of site.certifications) {
-    children.push(new Paragraph({ bullet: { level: 0 }, children: [new TextRun(cert)] }));
+  for (const cert of site.certificates) {
+    children.push(
+      new Paragraph({
+        bullet: { level: 0 },
+        children: [
+          new TextRun({ text: cert.name, bold: true }),
+          new TextRun(` — ${cert.issuer}, ${cert.date} (${cert.credentialUrl})`),
+        ],
+      })
+    );
   }
 
   for (const language of site.languages) {
@@ -300,8 +308,12 @@ function writePdf(): Promise<void> {
 
     sectionHeading("Certifications & Languages");
     doc.fontSize(9).font("Body");
-    for (const cert of site.certifications) {
-      doc.text(`•  ${cert}`);
+    for (const cert of site.certificates) {
+      doc
+        .font("Bold")
+        .text(`•  ${cert.name}`, { continued: true })
+        .font("Body")
+        .text(` — ${cert.issuer}, ${cert.date} (${cert.credentialUrl})`);
     }
     for (const language of site.languages) {
       doc.text(`•  ${language}`);

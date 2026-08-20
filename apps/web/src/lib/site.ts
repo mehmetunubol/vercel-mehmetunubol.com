@@ -38,6 +38,14 @@ export interface SocialLink {
   href: string;
 }
 
+export interface CertificateItem {
+  name: string;
+  issuer: string;
+  date: string;
+  credentialUrl: string;
+  pdf?: string;
+}
+
 export const site = {
   name: "Mehmet Ünübol",
   title: "Software Engineer",
@@ -126,13 +134,49 @@ export const site = {
     "REST / GraphQL",
   ] as readonly string[],
   languages: ["English — Professional (B2+)", "Turkish — Native"],
-  certifications: [
-    "Microservices: Asynchronous Messaging",
-    "Microservices: Design Patterns",
-    "Microservices Foundations",
-    "AI Engineering Essentials: Navigating the Tech Revolution",
-    "App Store Marketing Specialist",
-  ],
+  certificates: [
+    {
+      name: "Foundation: Introduction to LangChain - Python",
+      issuer: "LangChain Academy",
+      date: "2026-08-20",
+      credentialUrl: "https://academy.langchain.com/certificates/luxg3dyj8x",
+      pdf: "/certificates/langchain-academy-introduction-to-langchain-python.pdf",
+    },
+    {
+      name: "AI Engineering Essentials: Navigating the Tech Revolution",
+      issuer: "LinkedIn",
+      date: "2024-05",
+      credentialUrl:
+        "https://www.linkedin.com/learning/certificates/4475c7fbf2ec18387859f14444f5295d45f22ab07e126657017652e07a39f9e8/",
+    },
+    {
+      name: "Microservices: Asynchronous Messaging",
+      issuer: "LinkedIn",
+      date: "2023-12",
+      credentialUrl:
+        "https://www.linkedin.com/learning/certificates/9fdee0e33e5df93c439d8d3ef526b7db793ff01cc3442a744e3d609b445006bc/",
+    },
+    {
+      name: "Microservices: Design Patterns",
+      issuer: "LinkedIn",
+      date: "2023-12",
+      credentialUrl:
+        "https://www.linkedin.com/learning/certificates/23203fe842b252d65328ec05cb1f79351618b74433d5f1a4270a7c3b2a8b4bb8/",
+    },
+    {
+      name: "Microservices Foundations",
+      issuer: "LinkedIn",
+      date: "2023-12",
+      credentialUrl:
+        "https://www.linkedin.com/learning/certificates/94888ee93bffe5c516fa35602330cabf6d8ec7be780a2b334e0a8ce2aef0dd95/",
+    },
+    {
+      name: "App Store Marketing Specialist",
+      issuer: "MobileAction",
+      date: "2017-07",
+      credentialUrl: "https://academy.mobileaction.co/",
+    },
+  ] satisfies CertificateItem[],
   experience: [
     {
       company: "BrainRocket",
