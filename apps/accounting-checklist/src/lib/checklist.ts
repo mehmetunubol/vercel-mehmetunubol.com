@@ -124,13 +124,28 @@ const PAYMENT_ITEMS: ChecklistItemDef[] = [
     hasFile: true,
     fileLabel: "Receipt",
   },
+  // Home rent keeps the original "kira*" keys and index 4 so months saved
+  // before the home/office split stay attached to it. Office rent got a new,
+  // unused index (8) rather than renumbering — `index` is a persisted id
+  // (done flags, file attachments), not a display position.
   {
     index: 4,
-    title: "Rent (kira)",
+    title: "Rent — home (ev kirası)",
     icon: "home",
     fields: [
       { key: "kiraAmount", label: "Amount", type: "number" },
       { key: "kiraDueDate", label: "Due date", type: "date" },
+    ],
+    hasFile: true,
+    fileLabel: "Receipt",
+  },
+  {
+    index: 8,
+    title: "Rent — office (ofis kirası)",
+    icon: "office",
+    fields: [
+      { key: "ofisKiraAmount", label: "Amount", type: "number" },
+      { key: "ofisKiraDueDate", label: "Due date", type: "date" },
     ],
     hasFile: true,
     fileLabel: "Receipt",
@@ -296,6 +311,33 @@ export function resolveFieldDefault(
 }
 
 export const checklistDefaultsInputSchema = checklistDefaultsSchema;
+
+// Built-in defaults, used for any key the user hasn't configured in their
+// own defaults.json. Anything set in the Defaults panel (including clearing
+// a value to "") takes precedence over these.
+export const BUILTIN_DEFAULTS: Record<ChecklistKey, ChecklistDefaults> = {
+  invoices: { fields: {}, creditCards: {} },
+  payments: {
+    fields: {
+      kiraAmount: 38000,
+      kiraDueDate: 15,
+      ofisKiraAmount: 12000,
+      ofisKiraDueDate: 25,
+    },
+    creditCards: {},
+  },
+};
+
+export function withBuiltinDefaults(
+  checklistKey: ChecklistKey,
+  stored: ChecklistDefaults,
+): ChecklistDefaults {
+  const builtin = BUILTIN_DEFAULTS[checklistKey];
+  return {
+    fields: { ...builtin.fields, ...stored.fields },
+    creditCards: { ...builtin.creditCards, ...stored.creditCards },
+  };
+}
 
 // Sums every numeric field/entry across a checklist's items for one month —
 // used to total up "outgoing" payments, including default-filled blanks

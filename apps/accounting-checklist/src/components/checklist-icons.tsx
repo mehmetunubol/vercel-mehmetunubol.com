@@ -10,6 +10,7 @@ export type ItemIconName =
   | "home"
   | "heart"
   | "building"
+  | "office"
   | "plus-circle";
 
 const paths: Record<ItemIconName, string> = {
@@ -24,6 +25,8 @@ const paths: Record<ItemIconName, string> = {
   home: "M4 9.5 10 4l6 5.5V16a1 1 0 0 1-1 1h-3v-4H8v4H5a1 1 0 0 1-1-1z",
   heart: "M10 16.5 4 11a3.5 3.5 0 0 1 5-5l1 1 1-1a3.5 3.5 0 0 1 5 5z",
   building: "M4 17V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v13M14 17v-6h3a1 1 0 0 1 1 1v5M3 17h14M6.5 6h2M6.5 9h2M6.5 12h2",
+  // Desk with a monitor — distinct from "building" (used by Seferihisar dues).
+  office: "M3 15h14M5 15v2M15 15v2M7 4h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM10 11v4",
   "plus-circle": "M10 3.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM10 7v6M7 10h6",
 };
 
