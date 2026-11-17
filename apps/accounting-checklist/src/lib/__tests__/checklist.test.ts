@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   CHECKLISTS,
+  CHECKLIST_KEYS,
   DEFAULT_CREDIT_CARDS,
+  isChecklistKey,
   EMPTY_DEFAULTS,
   EMPTY_STATE,
   computeItemsTotal,
@@ -39,6 +41,29 @@ describe("payment items", () => {
     const office = CHECKLISTS.payments.items.find((i) => i.index === 8);
     expect(home?.fields.map((f) => f.key)).toEqual(["kiraAmount", "kiraDueDate"]);
     expect(office?.fields.map((f) => f.key)).toEqual(["ofisKiraAmount", "ofisKiraDueDate"]);
+  });
+});
+
+describe("report checklist", () => {
+  it("is registered as a tab with its own Drive folder", () => {
+    expect(CHECKLIST_KEYS).toContain("report");
+    expect(isChecklistKey("report")).toBe(true);
+    expect(CHECKLISTS.report.driveFolder).toBe("Report");
+  });
+
+  it("has a document item for every source plus the send step", () => {
+    const items = CHECKLISTS.report.items;
+    const indexes = items.map((i) => i.index);
+    expect(new Set(indexes).size).toBe(indexes.length);
+    expect(items).toHaveLength(9);
+    expect(items.slice(0, 8).every((i) => i.hasFile)).toBe(true);
+    expect(items.at(-1)?.fields.map((f) => f.key)).toEqual(["reportSentDate"]);
+  });
+
+  it("contributes nothing to totals", () => {
+    expect(
+      computeItemsTotal(CHECKLISTS.report.items, emptyMonthState(), EMPTY_DEFAULTS, "2026-11"),
+    ).toBe(0);
   });
 });
 

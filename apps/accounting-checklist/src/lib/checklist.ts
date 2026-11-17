@@ -14,7 +14,7 @@ export type ChecklistItemDef = {
   addEntryLabel?: string;
 };
 
-export type ChecklistKey = "invoices" | "payments";
+export type ChecklistKey = "invoices" | "payments" | "report";
 
 export type ChecklistDef = {
   key: ChecklistKey;
@@ -175,6 +175,82 @@ const PAYMENT_ITEMS: ChecklistItemDef[] = [
   },
 ];
 
+// Monthly document pack for the accountant: collect every document for the
+// month, then send it all together on the 1st of the following month.
+const REPORT_ITEMS: ChecklistItemDef[] = [
+  {
+    index: 1,
+    title: "Invoice — Bro",
+    icon: "receipt",
+    fields: [],
+    hasFile: true,
+    fileLabel: "Bro invoice",
+  },
+  {
+    index: 2,
+    title: "Invoice — Deparsoft",
+    icon: "receipt",
+    fields: [],
+    hasFile: true,
+    fileLabel: "Deparsoft invoice",
+  },
+  {
+    index: 3,
+    title: "Bank account transactions — Fiba (şahıs)",
+    icon: "bank",
+    fields: [],
+    hasFile: true,
+    fileLabel: "Fiba account statement",
+  },
+  {
+    index: 4,
+    title: "Office rent payment proof",
+    icon: "office",
+    fields: [],
+    hasFile: true,
+    fileLabel: "Office rent receipt (dekont)",
+  },
+  {
+    index: 5,
+    title: "Paid invoice — Electricity (elektrik)",
+    icon: "bolt",
+    fields: [],
+    hasFile: true,
+    fileLabel: "Electricity invoice",
+  },
+  {
+    index: 6,
+    title: "Paid invoice — Water (su)",
+    icon: "droplet",
+    fields: [],
+    hasFile: true,
+    fileLabel: "Water invoice",
+  },
+  {
+    index: 7,
+    title: "Paid invoice — Internet",
+    icon: "wifi",
+    fields: [],
+    hasFile: true,
+    fileLabel: "Internet invoice",
+  },
+  {
+    index: 8,
+    title: "Paid invoice — Mobile phone (cep telefonu)",
+    icon: "phone",
+    fields: [],
+    hasFile: true,
+    fileLabel: "Mobile phone invoice",
+  },
+  {
+    index: 9,
+    title: "Send all to accountant (1st of next month)",
+    icon: "send",
+    fields: [{ key: "reportSentDate", label: "Date sent", type: "date" }],
+    hasFile: false,
+  },
+];
+
 export const CHECKLISTS: Record<ChecklistKey, ChecklistDef> = {
   invoices: {
     key: "invoices",
@@ -188,9 +264,15 @@ export const CHECKLISTS: Record<ChecklistKey, ChecklistDef> = {
     driveFolder: "Payments",
     items: PAYMENT_ITEMS,
   },
+  report: {
+    key: "report",
+    title: "Report",
+    driveFolder: "Report",
+    items: REPORT_ITEMS,
+  },
 };
 
-export const CHECKLIST_KEYS: ChecklistKey[] = ["invoices", "payments"];
+export const CHECKLIST_KEYS: ChecklistKey[] = ["invoices", "payments", "report"];
 
 export function isChecklistKey(value: unknown): value is ChecklistKey {
   return typeof value === "string" && (CHECKLIST_KEYS as string[]).includes(value);
@@ -318,6 +400,7 @@ export const BUILTIN_DEFAULTS: Record<ChecklistKey, ChecklistDefaults> = {
     },
     creditCards: {},
   },
+  report: { fields: {}, creditCards: {} },
 };
 
 export function withBuiltinDefaults(
