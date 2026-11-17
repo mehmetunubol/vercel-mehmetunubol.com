@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CHECKLISTS,
+  DEFAULT_CREDIT_CARDS,
   EMPTY_DEFAULTS,
   EMPTY_STATE,
   computeItemsTotal,
@@ -15,6 +16,22 @@ describe("payment items", () => {
   it("has unique item indexes", () => {
     const indexes = CHECKLISTS.payments.items.map((i) => i.index);
     expect(new Set(indexes).size).toBe(indexes.length);
+  });
+
+  it("no longer includes Seferihisar dues", () => {
+    expect(CHECKLISTS.payments.items.some((i) => i.index === 6)).toBe(false);
+    expect(
+      CHECKLISTS.payments.items.flatMap((i) => i.fields).some((f) => f.key.startsWith("seferihisar")),
+    ).toBe(false);
+  });
+
+  it("seeds Vakıfbank as a default credit card", () => {
+    expect(DEFAULT_CREDIT_CARDS.map((c) => c.id)).toEqual([
+      "card-denizbank",
+      "card-yapikredi",
+      "card-enpara",
+      "card-vakifbank",
+    ]);
   });
 
   it("splits rent into home (keeps legacy kira keys) and office", () => {

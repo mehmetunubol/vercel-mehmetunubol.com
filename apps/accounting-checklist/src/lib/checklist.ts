@@ -89,6 +89,7 @@ export const DEFAULT_CREDIT_CARDS: { id: string; label: string }[] = [
   { id: "card-denizbank", label: "Denizbank" },
   { id: "card-yapikredi", label: "Yapı Kredi" },
   { id: "card-enpara", label: "Enpara" },
+  { id: "card-vakifbank", label: "Vakıfbank" },
 ];
 
 // Temporary/placeholder steps — to be refined later.
@@ -161,17 +162,8 @@ const PAYMENT_ITEMS: ChecklistItemDef[] = [
     hasFile: true,
     fileLabel: "Receipt",
   },
-  {
-    index: 6,
-    title: "Seferihisar dues (aidat)",
-    icon: "building",
-    fields: [
-      { key: "seferihisarAidatAmount", label: "Amount", type: "number" },
-      { key: "seferihisarAidatDueDate", label: "Due date", type: "date" },
-    ],
-    hasFile: true,
-    fileLabel: "Receipt",
-  },
+  // index 6 (Seferihisar dues) was removed — don't reuse it, old months'
+  // state.json may still carry a done flag / files under that index.
   {
     index: 7,
     title: "Custom expenses",
