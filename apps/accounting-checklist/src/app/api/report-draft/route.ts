@@ -10,6 +10,10 @@ import {
   planReportEmail,
 } from "@/lib/report-email";
 
+// Several sequential Drive downloads plus a ~23 MB Gmail upload — give it
+// an explicit budget rather than relying on the platform default.
+export const maxDuration = 60;
+
 // Creates (never sends) a Gmail draft for the month's Report checklist,
 // with every uploaded document attached.
 export async function POST(req: NextRequest) {
@@ -34,12 +38,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "no_files" }, { status: 400 });
   }
 
-  const titleOf = (itemIndex: number) =>
-    def.items.find((i) => i.index === itemIndex)?.title ?? "Evrak";
+  const titleOf = (itemIndex: number) => {
+    const item = def.items.find((i) => i.index === itemIndex);
+    return item?.emailLabel ?? item?.title ?? "Evrak";
+  };
 
   const attachments: MailAttachment[] = [];
   const attached: { itemTitle: string; name: string }[] = [];
   const linked: { itemTitle: string; name: string; webViewLink: string }[] = [];
+  // Couldn't be read at all (deleted, permission, network) — left out of
+  // the email and reported back, never passed off as a working link.
+  const failed: string[] = [];
   let totalBytes = 0;
 
   // Sequential on purpose: each file is checked against the budget that's
@@ -57,9 +66,12 @@ export async function POST(req: NextRequest) {
       attachments.push({ filename: file.name, mimeType: downloaded.mimeType, data: downloaded.data });
       attached.push({ itemTitle, name: file.name });
     } catch {
-      // File deleted or unreadable — still give the accountant a link.
-      linked.push({ itemTitle, name: file.name, webViewLink: file.webViewLink });
+      failed.push(file.name);
     }
+  }
+
+  if (attached.length === 0 && linked.length === 0) {
+    return NextResponse.json({ error: "download_failed", failed }, { status: 502 });
   }
 
   // Same resolution as the on-screen field: this month's value, else the
@@ -82,6 +94,7 @@ export async function POST(req: NextRequest) {
       gmailUrl: `https://mail.google.com/mail/u/0/#drafts?compose=${messageId}`,
       attachedCount: attached.length,
       linkedCount: linked.length,
+      failed,
       to: to ?? null,
     });
   } catch (error) {

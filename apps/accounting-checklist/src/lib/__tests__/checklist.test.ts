@@ -59,6 +59,13 @@ describe("report checklist", () => {
     expect(items.at(-1)?.fields.map((f) => f.key)).toEqual(["accountantEmail", "reportSentDate"]);
   });
 
+  it("names every document in Turkish for the accountant email", () => {
+    for (const item of CHECKLISTS.report.items.filter((i) => i.hasFile)) {
+      expect(item.emailLabel, item.title).toBeTruthy();
+      expect(item.fileLabel, item.title).toMatch(/fatura|hareket|dekont/i);
+    }
+  });
+
   it("contributes nothing to totals", () => {
     expect(
       computeItemsTotal(CHECKLISTS.report.items, emptyMonthState(), EMPTY_DEFAULTS, "2026-11"),

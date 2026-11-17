@@ -25,6 +25,8 @@ export type ChecklistItemDef = {
   fileLabel?: string;
   repeatableKey?: RepeatableKey;
   addEntryLabel?: string;
+  // Turkish name used in the accountant email (Report checklist).
+  emailLabel?: string;
 };
 
 export type ChecklistKey = "invoices" | "payments" | "report";
@@ -197,66 +199,74 @@ const REPORT_ITEMS: ChecklistItemDef[] = [
   {
     index: 1,
     title: "Invoice — Bro",
+    emailLabel: "Fatura — Bro",
     icon: "receipt",
     fields: [],
     hasFile: true,
-    fileLabel: "Bro invoice",
+    fileLabel: "Bro faturası",
   },
   {
     index: 2,
     title: "Invoice — Deparsoft",
+    emailLabel: "Fatura — Deparsoft",
     icon: "receipt",
     fields: [],
     hasFile: true,
-    fileLabel: "Deparsoft invoice",
+    fileLabel: "Deparsoft faturası",
   },
   {
     index: 3,
     title: "Bank account transactions — Fiba (şahıs)",
+    emailLabel: "Banka hesap hareketleri — Fiba (şahıs)",
     icon: "bank",
     fields: [],
     hasFile: true,
-    fileLabel: "Fiba account statement",
+    fileLabel: "Fiba şahıs hesap hareketleri",
   },
   {
     index: 4,
     title: "Office rent payment proof",
+    emailLabel: "Ofis kirası ödeme dekontu",
     icon: "office",
     fields: [],
     hasFile: true,
-    fileLabel: "Office rent receipt (dekont)",
+    fileLabel: "Ofis kirası dekontu",
   },
   {
     index: 5,
     title: "Paid invoice — Electricity (elektrik)",
+    emailLabel: "Ödenen fatura — Elektrik",
     icon: "bolt",
     fields: [],
     hasFile: true,
-    fileLabel: "Electricity invoice",
+    fileLabel: "Elektrik faturası",
   },
   {
     index: 6,
     title: "Paid invoice — Water (su)",
+    emailLabel: "Ödenen fatura — Su",
     icon: "droplet",
     fields: [],
     hasFile: true,
-    fileLabel: "Water invoice",
+    fileLabel: "Su faturası",
   },
   {
     index: 7,
     title: "Paid invoice — Internet",
+    emailLabel: "Ödenen fatura — İnternet",
     icon: "wifi",
     fields: [],
     hasFile: true,
-    fileLabel: "Internet invoice",
+    fileLabel: "İnternet faturası",
   },
   {
     index: 8,
     title: "Paid invoice — Mobile phone (cep telefonu)",
+    emailLabel: "Ödenen fatura — Cep telefonu",
     icon: "phone",
     fields: [],
     hasFile: true,
-    fileLabel: "Mobile phone invoice",
+    fileLabel: "Cep telefonu faturası",
   },
   {
     index: 9,

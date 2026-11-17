@@ -13,6 +13,8 @@ import {
   computeItemsTotal,
   currentMonthKey,
   emptyMonthState,
+  parseChecklistDefaults,
+  parseChecklistState,
   type ChecklistDefaults,
   type ChecklistKey,
   type ChecklistState,
@@ -21,6 +23,7 @@ import {
 } from "@/lib/checklist";
 import { createWriteQueue, enqueueWrite, flushWrites } from "@/lib/write-queue";
 import { planReportEmail } from "@/lib/report-email";
+import { ChecklistStateStore } from "@/lib/state-store";
 
 const GMAIL_ERROR_MESSAGES: Record<string, string> = {
   gmail_scope: "Gmail access isn't granted yet — sign out and sign back in once to allow creating drafts.",
@@ -29,6 +32,8 @@ const GMAIL_ERROR_MESSAGES: Record<string, string> = {
     "The Gmail API isn't enabled for this app's Google Cloud project — enable it in Google Cloud Console, then try again.",
   gmail_rate_limit: "Gmail is rate-limiting requests right now — wait a minute and try again.",
   no_files: "Nothing uploaded for this month yet.",
+  download_failed:
+    "None of this month's files could be read from Google Drive (deleted, or your session expired) — no draft was created.",
 };
 
 export function ChecklistApp() {
@@ -43,20 +48,51 @@ export function ChecklistApp() {
   // month after the picker changes.
   const [draftNotice, setDraftNotice] = useState<{
     month: string;
-    tone: "ok" | "error";
+    tone: "ok" | "warn" | "error";
     text: string;
     href?: string;
   } | null>(null);
   const [invoicesState, setInvoicesState] = useState<ChecklistState | null>(null);
 
+  const [loadError, setLoadError] = useState(false);
+  // Latest copy of every loaded checklist — see lib/state-store.ts.
+  const [store] = useState(() => new ChecklistStateStore());
+  // Debounced, ordered writes — see lib/write-queue.ts.
+  const defaultsWrites = useRef(createWriteQueue<ChecklistDefaults>());
+  const stateWrites = useRef(createWriteQueue<ChecklistState>());
+  // Which checklist is on screen, readable from async handlers that
+  // started before a tab switch.
+  const activeChecklist = useRef(checklist);
+
   useEffect(() => {
-    fetch(`/api/state?checklist=${checklist}`)
-      .then((res) => res.json())
-      .then(setState);
-    fetch(`/api/defaults?checklist=${checklist}`)
-      .then((res) => res.json())
-      .then(setDefaults);
-  }, [checklist]);
+    let cancelled = false;
+    const versionAtFetchStart = store.version(checklist);
+
+    void (async () => {
+      // Let this checklist's own pending saves land first, so the GET below
+      // can't return data older than what the user just edited.
+      await Promise.all([flushWrites(stateWrites.current), flushWrites(defaultsWrites.current)]);
+      const [stateRes, defaultsRes] = await Promise.all([
+        fetch(`/api/state?checklist=${checklist}`).catch(() => null),
+        fetch(`/api/defaults?checklist=${checklist}`).catch(() => null),
+      ]);
+      // A newer tab switch superseded this load.
+      if (cancelled) return;
+      if (!stateRes?.ok || !defaultsRes?.ok) {
+        setLoadError(true);
+        return;
+      }
+      const [rawState, rawDefaults] = await Promise.all([stateRes.json(), defaultsRes.json()]);
+      if (cancelled) return;
+      setLoadError(false);
+      setState(store.receive(checklist, parseChecklistState(rawState), versionAtFetchStart));
+      setDefaults(parseChecklistDefaults(rawDefaults));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [checklist, store]);
 
   // Payments' totals section references the matching month's SMM invoice
   // (EURO/TRY/rate) for context — fetched only while viewing Payments, and
@@ -70,18 +106,16 @@ export function ChecklistApp() {
   }, [checklist, month]);
 
   function selectChecklist(key: ChecklistKey) {
-    // Send any edits for the checklist being left right away (each write is
-    // bound to its own checklist's URL, so this is about promptness).
+    // Send edits for the checklist being left right away; the load effect
+    // also waits for them before fetching.
     void flushWrites(stateWrites.current);
     void flushWrites(defaultsWrites.current);
+    activeChecklist.current = key;
     setState(null);
     setDefaults(EMPTY_DEFAULTS);
+    setLoadError(false);
     setChecklist(key);
   }
-
-  // Debounced, ordered writes — see lib/write-queue.ts.
-  const defaultsWrites = useRef(createWriteQueue<ChecklistDefaults>());
-  const stateWrites = useRef(createWriteQueue<ChecklistState>());
 
   const persistDefaults = useCallback(
     (next: ChecklistDefaults) => {
@@ -110,15 +144,16 @@ export function ChecklistApp() {
     });
   }
 
-  const persist = useCallback(
-    (next: ChecklistState) => {
-      setState(next);
-      enqueueWrite(stateWrites.current, `/api/state?checklist=${checklist}`, next);
-    },
-    [checklist],
-  );
-
   const items = CHECKLISTS[checklist].items;
+
+  if (loadError) {
+    return (
+      <div role="alert" className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm">
+        Couldn&apos;t load your checklist from Google Drive — your session may have expired. Sign out and
+        sign back in, then try again.
+      </div>
+    );
+  }
 
   if (!state) {
     return (
@@ -137,11 +172,18 @@ export function ChecklistApp() {
   const monthState = currentState.months[month] ?? emptyMonthState();
   const doneCount = items.filter((def) => monthState.items[def.index]).length;
 
-  function updateMonthState(mutate: (prev: typeof monthState) => typeof monthState) {
-    const next: ChecklistState = {
-      months: { ...currentState.months, [month]: mutate(monthState) },
-    };
-    void persist(next);
+  // Applies an edit to the latest copy of a given checklist + month, never
+  // to this render's snapshot — async handlers pass the target they
+  // started on, so a finishing upload can't clobber edits made meanwhile
+  // or land in whichever checklist/month is on screen by then.
+  function updateMonthState(
+    mutate: (prev: MonthState) => MonthState,
+    target: { checklist: ChecklistKey; month: string } = { checklist, month },
+  ) {
+    const next = store.update(target.checklist, target.month, mutate);
+    if (!next) return;
+    if (activeChecklist.current === target.checklist) setState(next);
+    enqueueWrite(stateWrites.current, `/api/state?checklist=${target.checklist}`, next);
   }
 
   function handleToggle(index: number, done: boolean) {
@@ -157,6 +199,7 @@ export function ChecklistApp() {
   }
 
   async function handleUpload(index: number, file: File) {
+    const target = { checklist, month };
     const def = items.find((d) => d.index === index);
     const label = def?.fileLabel ?? def?.title ?? "Attachment";
     const extension = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : "";
@@ -173,13 +216,16 @@ export function ChecklistApp() {
     if (!response.ok) return;
     const uploaded = (await response.json()) as { id: string; webViewLink: string };
 
-    updateMonthState((prev) => ({
-      ...prev,
-      files: [
-        ...prev.files,
-        { itemIndex: index, driveFileId: uploaded.id, name: uploadName, webViewLink: uploaded.webViewLink },
-      ],
-    }));
+    updateMonthState(
+      (prev) => ({
+        ...prev,
+        files: [
+          ...prev.files,
+          { itemIndex: index, driveFileId: uploaded.id, name: uploadName, webViewLink: uploaded.webViewLink },
+        ],
+      }),
+      target,
+    );
   }
 
   function handleAddEntry(key: RepeatableKey) {
@@ -214,6 +260,7 @@ export function ChecklistApp() {
   }
 
   async function handleGenerateSummary() {
+    const target = { checklist, month };
     setGeneratingSummary(true);
     try {
       const response = await fetch("/api/summary", {
@@ -223,10 +270,13 @@ export function ChecklistApp() {
       });
       if (!response.ok) return;
       const doc = (await response.json()) as { id: string; webViewLink: string };
-      updateMonthState((prev) => ({
-        ...prev,
-        summary: { fileId: doc.id, webViewLink: doc.webViewLink },
-      }));
+      updateMonthState(
+        (prev) => ({
+          ...prev,
+          summary: { fileId: doc.id, webViewLink: doc.webViewLink },
+        }),
+        target,
+      );
       window.open(doc.webViewLink, "_blank");
     } finally {
       setGeneratingSummary(false);
@@ -284,6 +334,7 @@ export function ChecklistApp() {
         gmailUrl?: string;
         attachedCount?: number;
         linkedCount?: number;
+        failed?: string[];
         to?: string | null;
       };
 
@@ -297,10 +348,21 @@ export function ChecklistApp() {
         return;
       }
 
+      const failed = result.failed ?? [];
       const parts = [`Draft created with ${result.attachedCount} attachment(s)`];
-      if (result.linkedCount) parts.push(`${result.linkedCount} too large, added as Drive links`);
+      if (result.linkedCount) {
+        // webViewLinks are private to the owner — the accountant can't open
+        // them until they're shared.
+        parts.push(`${result.linkedCount} too large, added as Drive links (share those files with your accountant)`);
+      }
+      if (failed.length > 0) parts.push(`couldn't read and left out: ${failed.join(", ")}`);
       if (!result.to) parts.push("no recipient set — add the accountant email in Defaults");
-      setDraftNotice({ month: draftMonth, tone: "ok", text: `${parts.join(" · ")}.`, href: result.gmailUrl });
+      setDraftNotice({
+        month: draftMonth,
+        tone: failed.length > 0 ? "warn" : "ok",
+        text: `${parts.join(" · ")}.`,
+        href: result.gmailUrl,
+      });
       if (draftWindow) draftWindow.location.href = result.gmailUrl;
     } catch {
       draftWindow?.close();
@@ -386,7 +448,9 @@ export function ChecklistApp() {
           className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border px-3 py-2 text-sm ${
             draftNotice.tone === "ok"
               ? "border-accent/30 bg-accent/5"
-              : "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"
+              : draftNotice.tone === "warn"
+                ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                : "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"
           }`}
         >
           <span>{draftNotice.text}</span>
