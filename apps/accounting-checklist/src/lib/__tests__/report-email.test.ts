@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CHECKLISTS, emptyMonthState } from "@/lib/checklist";
-import { buildMimeMessage, encodeHeaderValue } from "@/lib/gmail";
+import { buildMimeMessage, classifyGmailError, encodeHeaderValue } from "@/lib/gmail";
 import {
   buildReportBody,
   normalizeRecipient,
@@ -70,7 +70,8 @@ describe("buildMimeMessage", () => {
     expect(mime).toContain("To: muhasebe@example.com");
     expect(mime).toContain(`Subject: ${encodeHeaderValue("Kasım 2026 muhasebe evrakları")}`);
     expect(mime).toContain('boundary="BOUNDARY"');
-    expect(mime).toContain(`filename="${encodeHeaderValue("Fiba şahıs.pdf")}"`);
+    expect(mime).toContain("filename*=UTF-8''Fiba%20%C5%9Fah%C4%B1s.pdf");
+    expect(mime).not.toMatch(/filename="/);
     expect(mime).toContain(Buffer.from("PDF").toString("base64"));
     expect(mime.trimEnd().endsWith("--BOUNDARY--")).toBe(true);
   });
@@ -82,5 +83,39 @@ describe("buildMimeMessage", () => {
 
   it("strips CR/LF from header values", () => {
     expect(encodeHeaderValue("a\r\nBcc: x")).toBe("a Bcc: x");
+  });
+});
+
+describe("encodeHeaderValue", () => {
+  it("keeps every encoded-word within the RFC 2047 75-char limit and folds them", () => {
+    const long = "Fiba şahıs hesap ekstresi Kasım 2026 — tüm hareketler ve açıklamalar.pdf";
+    const encoded = encodeHeaderValue(long);
+    const words = encoded.split(/\r\n /);
+    expect(words.length).toBeGreaterThan(1);
+    for (const word of words) expect(word.length).toBeLessThanOrEqual(75);
+    const decoded = words
+      .map((w) => Buffer.from(w.replace(/^=\?UTF-8\?B\?|\?=$/g, ""), "base64").toString("utf8"))
+      .join("");
+    expect(decoded).toBe(long);
+  });
+});
+
+describe("classifyGmailError", () => {
+  const apiError = (status: number, reason?: string, message = "") => ({
+    response: { status, data: { error: { message, errors: reason ? [{ reason }] : [] } } },
+  });
+
+  it("distinguishes why Gmail refused", () => {
+    expect(classifyGmailError(apiError(403, "insufficientPermissions"))).toBe("scope");
+    expect(classifyGmailError(apiError(403, "accessNotConfigured"))).toBe("api_disabled");
+    expect(classifyGmailError(apiError(403, "rateLimitExceeded"))).toBe("rate_limit");
+    expect(classifyGmailError(apiError(429))).toBe("rate_limit");
+    expect(classifyGmailError(apiError(401))).toBe("auth");
+  });
+
+  it("doesn't blame missing scopes for unrelated failures", () => {
+    expect(classifyGmailError(apiError(403, "forbidden"))).toBeNull();
+    expect(classifyGmailError(apiError(500))).toBeNull();
+    expect(classifyGmailError(new Error("network down"))).toBeNull();
   });
 });

@@ -3,11 +3,24 @@ import type { ItemIconName } from "@/components/checklist-icons";
 
 export type RepeatableKey = "customExpenses" | "creditCards";
 
+export type ChecklistFieldDef = {
+  key: string;
+  label: string;
+  type: "text" | "number" | "date";
+  // Fallback used when the user hasn't configured a default for this key.
+  // Only applies to months >= `since` (YYYY-MM), so introducing one never
+  // rewrites past months' values or totals. Dates are a day of month.
+  builtinDefault?: { value: string | number; since: string };
+  // Values that must be entered per month (e.g. "date sent") — no default
+  // can be configured, since a pre-filled value would be misleading.
+  noDefault?: boolean;
+};
+
 export type ChecklistItemDef = {
   index: number;
   title: string;
   icon: ItemIconName;
-  fields: { key: string; label: string; type: "text" | "number" | "date" }[];
+  fields: ChecklistFieldDef[];
   hasFile: boolean;
   fileLabel?: string;
   repeatableKey?: RepeatableKey;
@@ -92,6 +105,9 @@ export const DEFAULT_CREDIT_CARDS: { id: string; label: string }[] = [
   { id: "card-vakifbank", label: "Vakıfbank" },
 ];
 
+// First month the home/office rent split (and its built-in amounts) applies.
+const RENT_SPLIT_MONTH = "2026-11";
+
 // Temporary/placeholder steps — to be refined later.
 const PAYMENT_ITEMS: ChecklistItemDef[] = [
   {
@@ -134,8 +150,8 @@ const PAYMENT_ITEMS: ChecklistItemDef[] = [
     title: "Rent — home (ev kirası)",
     icon: "home",
     fields: [
-      { key: "kiraAmount", label: "Amount", type: "number" },
-      { key: "kiraDueDate", label: "Due date", type: "date" },
+      { key: "kiraAmount", label: "Amount", type: "number", builtinDefault: { value: 38000, since: RENT_SPLIT_MONTH } },
+      { key: "kiraDueDate", label: "Due date", type: "date", builtinDefault: { value: 15, since: RENT_SPLIT_MONTH } },
     ],
     hasFile: true,
     fileLabel: "Receipt",
@@ -145,8 +161,8 @@ const PAYMENT_ITEMS: ChecklistItemDef[] = [
     title: "Rent — office (ofis kirası)",
     icon: "office",
     fields: [
-      { key: "ofisKiraAmount", label: "Amount", type: "number" },
-      { key: "ofisKiraDueDate", label: "Due date", type: "date" },
+      { key: "ofisKiraAmount", label: "Amount", type: "number", builtinDefault: { value: 12000, since: RENT_SPLIT_MONTH } },
+      { key: "ofisKiraDueDate", label: "Due date", type: "date", builtinDefault: { value: 25, since: RENT_SPLIT_MONTH } },
     ],
     hasFile: true,
     fileLabel: "Receipt",
@@ -250,7 +266,7 @@ const REPORT_ITEMS: ChecklistItemDef[] = [
     // Defaults panel and every month picks it up.
     fields: [
       { key: "accountantEmail", label: "Accountant email", type: "text" },
-      { key: "reportSentDate", label: "Date sent", type: "date" },
+      { key: "reportSentDate", label: "Date sent", type: "date", noDefault: true },
     ],
     hasFile: false,
   },
@@ -391,37 +407,27 @@ export function resolveFieldDefault(
 
 export const checklistDefaultsInputSchema = checklistDefaultsSchema;
 
-// Built-in defaults, used for any key the user hasn't configured in their
-// own defaults.json. Anything set in the Defaults panel (including clearing
-// a value to "") takes precedence over these.
-export const BUILTIN_DEFAULTS: Record<ChecklistKey, ChecklistDefaults> = {
-  invoices: { fields: {}, creditCards: {} },
-  payments: {
-    fields: {
-      kiraAmount: 38000,
-      kiraDueDate: 15,
-      ofisKiraAmount: 12000,
-      ofisKiraDueDate: 25,
-    },
-    creditCards: {},
-  },
-  report: { fields: {}, creditCards: {} },
-};
-
-export function withBuiltinDefaults(
-  checklistKey: ChecklistKey,
-  stored: ChecklistDefaults,
-): ChecklistDefaults {
-  const builtin = BUILTIN_DEFAULTS[checklistKey];
-  return {
-    fields: { ...builtin.fields, ...stored.fields },
-    creditCards: { ...builtin.creditCards, ...stored.creditCards },
-  };
+// The single place a field's default is resolved, for the UI, totals and
+// printed summary alike: the user's configured default wins (even "", which
+// means "deliberately no default"); otherwise the field's built-in default,
+// but only from the month it was introduced. Built-ins are never written to
+// defaults.json, so changing one in code takes effect everywhere.
+export function fieldDefault(
+  field: ChecklistFieldDef,
+  monthKey: string,
+  defaults: ChecklistDefaults,
+): string | number | undefined {
+  if (field.noDefault) return undefined;
+  const configured = Object.hasOwn(defaults.fields, field.key) ? defaults.fields[field.key] : undefined;
+  if (configured !== undefined) return resolveFieldDefault(field.type, monthKey, configured);
+  const builtin = field.builtinDefault;
+  if (builtin && monthKey >= builtin.since) return resolveFieldDefault(field.type, monthKey, builtin.value);
+  return undefined;
 }
 
 // Sums every numeric field/entry across a checklist's items for one month —
 // used to total up "outgoing" payments, including default-filled blanks
-// (defaults + resolveFieldDefault) so the total matches what the UI shows.
+// (fieldDefault) so the total matches what the UI shows.
 export function computeItemsTotal(
   items: ChecklistItemDef[],
   monthState: MonthState,
@@ -433,7 +439,7 @@ export function computeItemsTotal(
   for (const item of items) {
     for (const field of item.fields) {
       if (field.type !== "number") continue;
-      const raw = monthState.fields[field.key] ?? resolveFieldDefault(field.type, monthKey, defaults.fields[field.key]);
+      const raw = monthState.fields[field.key] ?? fieldDefault(field, monthKey, defaults);
       const num = Number(raw);
       if (raw !== undefined && raw !== "" && !Number.isNaN(num)) total += num;
     }

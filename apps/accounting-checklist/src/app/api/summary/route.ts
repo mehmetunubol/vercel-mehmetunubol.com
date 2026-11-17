@@ -12,7 +12,6 @@ import {
   computeItemsTotal,
   emptyMonthState,
   isChecklistKey,
-  withBuiltinDefaults,
 } from "@/lib/checklist";
 import { buildSummaryHtml, type SummaryTotals } from "@/lib/summary";
 
@@ -29,11 +28,10 @@ export async function POST(req: NextRequest) {
 
   const folderId = await getOrCreateChecklistFolder(accessToken, checklist);
   const monthFolderId = await getOrCreateMonthFolder(accessToken, folderId, month);
-  const [state, storedDefaults] = await Promise.all([
+  const [state, defaults] = await Promise.all([
     readState(accessToken, folderId),
     readDefaults(accessToken, folderId),
   ]);
-  const defaults = withBuiltinDefaults(checklist, storedDefaults);
   const monthState = state.months[month] ?? emptyMonthState();
 
   let totals: SummaryTotals | undefined;

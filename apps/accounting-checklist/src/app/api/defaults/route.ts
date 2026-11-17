@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getDriveAccessToken } from "@/lib/auth";
 import { getOrCreateChecklistFolder, readDefaults, writeDefaults } from "@/lib/drive";
-import { checklistDefaultsInputSchema, isChecklistKey, withBuiltinDefaults } from "@/lib/checklist";
+import { checklistDefaultsInputSchema, isChecklistKey } from "@/lib/checklist";
 
 export async function GET(req: NextRequest) {
   const accessToken = await getDriveAccessToken(req);
@@ -14,7 +14,9 @@ export async function GET(req: NextRequest) {
 
   const folderId = await getOrCreateChecklistFolder(accessToken, checklist);
   const defaults = await readDefaults(accessToken, folderId);
-  return NextResponse.json(withBuiltinDefaults(checklist, defaults));
+  // Stored values only — built-ins are resolved per field via fieldDefault,
+  // so they never round-trip back into defaults.json on the next PATCH.
+  return NextResponse.json(defaults);
 }
 
 export async function PATCH(req: NextRequest) {

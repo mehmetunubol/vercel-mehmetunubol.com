@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getDriveAccessToken } from "@/lib/auth";
 import { downloadFile, getOrCreateChecklistFolder, readDefaults, readState } from "@/lib/drive";
-import { CHECKLISTS, emptyMonthState, withBuiltinDefaults } from "@/lib/checklist";
-import { buildMimeMessage, createGmailDraft, GmailScopeError, type MailAttachment } from "@/lib/gmail";
+import { CHECKLISTS, emptyMonthState } from "@/lib/checklist";
+import { buildMimeMessage, createGmailDraft, GmailDraftError, type MailAttachment } from "@/lib/gmail";
 import {
   MAX_ATTACHMENT_BYTES,
   buildReportBody,
@@ -16,18 +16,17 @@ export async function POST(req: NextRequest) {
   const accessToken = await getDriveAccessToken(req);
   if (!accessToken) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { month } = (await req.json()) as { month?: unknown };
+  const { month } = ((await req.json().catch(() => ({}))) ?? {}) as { month?: unknown };
   if (typeof month !== "string" || !/^\d{4}-\d{2}$/.test(month)) {
     return NextResponse.json({ error: "missing month" }, { status: 400 });
   }
 
   const def = CHECKLISTS.report;
   const folderId = await getOrCreateChecklistFolder(accessToken, "report");
-  const [state, storedDefaults] = await Promise.all([
+  const [state, defaults] = await Promise.all([
     readState(accessToken, folderId),
     readDefaults(accessToken, folderId),
   ]);
-  const defaults = withBuiltinDefaults("report", storedDefaults);
   const monthState = state.months[month] ?? emptyMonthState();
 
   const plan = planReportEmail(def.items, monthState, month);
@@ -43,13 +42,14 @@ export async function POST(req: NextRequest) {
   const linked: { itemTitle: string; name: string; webViewLink: string }[] = [];
   let totalBytes = 0;
 
-  // Sequential on purpose: keeps peak memory to one file at a time on top
-  // of what's already been accepted, and stops downloading once full.
+  // Sequential on purpose: each file is checked against the budget that's
+  // left, so peak memory stays at one file on top of what's been accepted,
+  // and a file that won't fit is linked without being downloaded.
   for (const file of plan.files) {
     const itemTitle = titleOf(file.itemIndex);
     try {
-      const downloaded = await downloadFile(accessToken, file.driveFileId);
-      if (totalBytes + downloaded.size > MAX_ATTACHMENT_BYTES) {
+      const downloaded = await downloadFile(accessToken, file.driveFileId, MAX_ATTACHMENT_BYTES - totalBytes);
+      if (downloaded.kind === "too_large") {
         linked.push({ itemTitle, name: file.name, webViewLink: file.webViewLink });
         continue;
       }
@@ -81,8 +81,9 @@ export async function POST(req: NextRequest) {
       to: to ?? null,
     });
   } catch (error) {
-    if (error instanceof GmailScopeError) {
-      return NextResponse.json({ error: "gmail_scope" }, { status: 403 });
+    if (error instanceof GmailDraftError) {
+      const status = error.failure === "rate_limit" ? 429 : error.failure === "auth" ? 401 : 403;
+      return NextResponse.json({ error: `gmail_${error.failure}` }, { status });
     }
     throw error;
   }

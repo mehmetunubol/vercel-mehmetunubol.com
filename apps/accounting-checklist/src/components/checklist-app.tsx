@@ -20,6 +20,39 @@ import {
   type RepeatableKey,
 } from "@/lib/checklist";
 
+type PendingRefs<T> = {
+  timer: { current: ReturnType<typeof setTimeout> | null };
+  pending: { current: T | null };
+};
+
+// Sends a debounced write right away (or does nothing if none is queued).
+// Used both by the debounce timers and to flush before actions that make
+// the server read state — returns false if the save failed.
+async function flushPending<T>({ timer, pending }: PendingRefs<T>, url: string): Promise<boolean> {
+  if (timer.current) {
+    clearTimeout(timer.current);
+    timer.current = null;
+  }
+  const toSend = pending.current;
+  pending.current = null;
+  if (!toSend) return true;
+  const response = await fetch(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(toSend),
+  }).catch(() => null);
+  return Boolean(response?.ok);
+}
+
+const GMAIL_ERROR_MESSAGES: Record<string, string> = {
+  gmail_scope: "Gmail access isn't granted yet — sign out and sign back in once to allow creating drafts.",
+  gmail_auth: "Your Google session expired — sign out and sign back in.",
+  gmail_api_disabled:
+    "The Gmail API isn't enabled for this app's Google Cloud project — enable it in Google Cloud Console, then try again.",
+  gmail_rate_limit: "Gmail is rate-limiting requests right now — wait a minute and try again.",
+  no_files: "Nothing uploaded for this month yet.",
+};
+
 export function ChecklistApp() {
   const [checklist, setChecklist] = useState<ChecklistKey>("invoices");
   const [state, setState] = useState<ChecklistState | null>(null);
@@ -28,9 +61,14 @@ export function ChecklistApp() {
   const [month, setMonth] = useState(() => currentMonthKey());
   const [generatingSummary, setGeneratingSummary] = useState(false);
   const [creatingDraft, setCreatingDraft] = useState(false);
-  const [draftNotice, setDraftNotice] = useState<{ tone: "ok" | "error"; text: string; href?: string } | null>(
-    null,
-  );
+  // Tagged with the month it belongs to, so it isn't shown under another
+  // month after the picker changes.
+  const [draftNotice, setDraftNotice] = useState<{
+    month: string;
+    tone: "ok" | "error";
+    text: string;
+    href?: string;
+  } | null>(null);
   const [invoicesState, setInvoicesState] = useState<ChecklistState | null>(null);
 
   useEffect(() => {
@@ -72,15 +110,10 @@ export function ChecklistApp() {
       pendingDefaultsRef.current = next;
       if (defaultsWriteTimer.current) clearTimeout(defaultsWriteTimer.current);
       defaultsWriteTimer.current = setTimeout(() => {
-        defaultsWriteTimer.current = null;
-        const toSend = pendingDefaultsRef.current;
-        pendingDefaultsRef.current = null;
-        if (!toSend) return;
-        void fetch(`/api/defaults?checklist=${checklist}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(toSend),
-        });
+        void flushPending(
+          { timer: defaultsWriteTimer, pending: pendingDefaultsRef },
+          `/api/defaults?checklist=${checklist}`,
+        );
       }, 700);
     },
     [checklist],
@@ -110,15 +143,7 @@ export function ChecklistApp() {
       pendingStateRef.current = next;
       if (stateWriteTimer.current) clearTimeout(stateWriteTimer.current);
       stateWriteTimer.current = setTimeout(() => {
-        stateWriteTimer.current = null;
-        const toSend = pendingStateRef.current;
-        pendingStateRef.current = null;
-        if (!toSend) return;
-        void fetch(`/api/state?checklist=${checklist}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(toSend),
-        });
+        void flushPending({ timer: stateWriteTimer, pending: pendingStateRef }, `/api/state?checklist=${checklist}`);
       }, 700);
     },
     [checklist],
@@ -240,20 +265,6 @@ export function ChecklistApp() {
   }
 
   async function handleCreateDraft() {
-    // Flush any debounced edit (e.g. a just-typed accountant email) so the
-    // server reads the same state the user sees.
-    if (stateWriteTimer.current && pendingStateRef.current) {
-      clearTimeout(stateWriteTimer.current);
-      stateWriteTimer.current = null;
-      const toSend = pendingStateRef.current;
-      pendingStateRef.current = null;
-      await fetch(`/api/state?checklist=${checklist}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(toSend),
-      });
-    }
-
     const missing = items
       .filter((def) => def.hasFile && !monthState.files.some((f) => f.itemIndex === def.index))
       .map((def) => `• ${def.title}`);
@@ -264,13 +275,36 @@ export function ChecklistApp() {
       return;
     }
 
+    // Open the tab now, while the click still counts as a user gesture —
+    // a window.open after the awaits below would be popup-blocked. It's
+    // pointed at the draft once it exists, or closed on failure.
+    const draftWindow = window.open("", "_blank");
+    draftWindow?.document.write("<p style='font-family:sans-serif'>Preparing Gmail draft…</p>");
+
+    const draftMonth = month;
     setCreatingDraft(true);
     setDraftNotice(null);
     try {
+      // Flush both debounced writes (e.g. an accountant email just typed in
+      // the month or in Defaults) so the server reads what the user sees.
+      const [stateSaved, defaultsSaved] = await Promise.all([
+        flushPending({ timer: stateWriteTimer, pending: pendingStateRef }, `/api/state?checklist=${checklist}`),
+        flushPending({ timer: defaultsWriteTimer, pending: pendingDefaultsRef }, `/api/defaults?checklist=${checklist}`),
+      ]);
+      if (!stateSaved || !defaultsSaved) {
+        draftWindow?.close();
+        setDraftNotice({
+          month: draftMonth,
+          tone: "error",
+          text: "Couldn't save your latest changes, so no draft was created. Try again.",
+        });
+        return;
+      }
+
       const response = await fetch("/api/report-draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ month }),
+        body: JSON.stringify({ month: draftMonth }),
       });
       const result = (await response.json().catch(() => ({}))) as {
         error?: string;
@@ -280,22 +314,24 @@ export function ChecklistApp() {
         to?: string | null;
       };
 
-      if (!response.ok) {
-        const text =
-          result.error === "gmail_scope"
-            ? "Gmail access isn't granted yet — sign out and sign back in once to allow creating drafts."
-            : result.error === "no_files"
-              ? "Nothing uploaded for this month yet."
-              : "Couldn't create the Gmail draft. Try again.";
-        setDraftNotice({ tone: "error", text });
+      if (!response.ok || !result.gmailUrl) {
+        draftWindow?.close();
+        setDraftNotice({
+          month: draftMonth,
+          tone: "error",
+          text: (result.error && GMAIL_ERROR_MESSAGES[result.error]) ?? "Couldn't create the Gmail draft. Try again.",
+        });
         return;
       }
 
       const parts = [`Draft created with ${result.attachedCount} attachment(s)`];
       if (result.linkedCount) parts.push(`${result.linkedCount} too large, added as Drive links`);
       if (!result.to) parts.push("no recipient set — add the accountant email in Defaults");
-      setDraftNotice({ tone: "ok", text: `${parts.join(" · ")}.`, href: result.gmailUrl });
-      if (result.gmailUrl) window.open(result.gmailUrl, "_blank");
+      setDraftNotice({ month: draftMonth, tone: "ok", text: `${parts.join(" · ")}.`, href: result.gmailUrl });
+      if (draftWindow) draftWindow.location.href = result.gmailUrl;
+    } catch {
+      draftWindow?.close();
+      setDraftNotice({ month: draftMonth, tone: "error", text: "Couldn't create the Gmail draft. Try again." });
     } finally {
       setCreatingDraft(false);
     }
@@ -371,7 +407,7 @@ export function ChecklistApp() {
           ) : null}
         </div>
       </div>
-      {checklist === "report" && draftNotice ? (
+      {checklist === "report" && draftNotice?.month === month ? (
         <div
           role="status"
           className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border px-3 py-2 text-sm ${

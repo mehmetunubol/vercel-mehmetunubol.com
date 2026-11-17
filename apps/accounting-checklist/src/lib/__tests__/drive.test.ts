@@ -23,7 +23,7 @@ vi.mock("googleapis", () => ({
   },
 }));
 
-const { getOrCreateChecklistFolder, readState, writeState } = await import("@/lib/drive");
+const { downloadFile, getOrCreateChecklistFolder, readState, writeState } = await import("@/lib/drive");
 
 beforeEach(() => {
   filesList.mockReset();
@@ -80,5 +80,33 @@ describe("state round-trip", () => {
     await writeState("token", "root-id", { months: {} });
     expect(filesUpdate).toHaveBeenCalledOnce();
     expect(filesCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe("downloadFile", () => {
+  it("skips the media download when metadata says the file won't fit", async () => {
+    filesGet.mockResolvedValueOnce({ data: { mimeType: "application/pdf", size: "5000" } });
+    const result = await downloadFile("token", "file-id", 1000);
+    expect(result).toEqual({ kind: "too_large", size: 5000 });
+    expect(filesGet).toHaveBeenCalledTimes(1);
+  });
+
+  it("downloads files that fit", async () => {
+    filesGet
+      .mockResolvedValueOnce({ data: { mimeType: "application/pdf", size: "3" } })
+      .mockResolvedValueOnce({ data: new Uint8Array([1, 2, 3]).buffer });
+    const result = await downloadFile("token", "file-id", 1000);
+    expect(result.kind).toBe("downloaded");
+    if (result.kind === "downloaded") {
+      expect(result.size).toBe(3);
+      expect(result.mimeType).toBe("application/pdf");
+    }
+  });
+
+  it("re-checks the real size when metadata has none", async () => {
+    filesGet
+      .mockResolvedValueOnce({ data: { mimeType: "image/heic" } })
+      .mockResolvedValueOnce({ data: new Uint8Array(10).buffer });
+    expect(await downloadFile("token", "file-id", 5)).toEqual({ kind: "too_large", size: 10 });
   });
 });

@@ -10,8 +10,7 @@ import {
   currentMonthKey,
   emptyMonthState,
   parseChecklistState,
-  resolveFieldDefault,
-  withBuiltinDefaults,
+  fieldDefault,
 } from "@/lib/checklist";
 
 describe("payment items", () => {
@@ -67,31 +66,37 @@ describe("report checklist", () => {
   });
 });
 
-describe("withBuiltinDefaults", () => {
-  it("fills rent defaults when nothing is configured", () => {
-    const d = withBuiltinDefaults("payments", EMPTY_DEFAULTS);
-    expect(d.fields.kiraAmount).toBe(38000);
-    expect(d.fields.ofisKiraAmount).toBe(12000);
-    expect(resolveFieldDefault("date", "2026-11", d.fields.kiraDueDate)).toBe("2026-11-15");
-    expect(resolveFieldDefault("date", "2026-11", d.fields.ofisKiraDueDate)).toBe("2026-11-25");
+describe("fieldDefault (built-in defaults)", () => {
+  const payments = CHECKLISTS.payments.items;
+  const field = (key: string) => payments.flatMap((i) => i.fields).find((f) => f.key === key)!;
+
+  it("fills rent defaults from the rent-split month on", () => {
+    expect(fieldDefault(field("kiraAmount"), "2026-11", EMPTY_DEFAULTS)).toBe(38000);
+    expect(fieldDefault(field("ofisKiraAmount"), "2026-12", EMPTY_DEFAULTS)).toBe(12000);
+    expect(fieldDefault(field("kiraDueDate"), "2026-11", EMPTY_DEFAULTS)).toBe("2026-11-15");
+    expect(fieldDefault(field("ofisKiraDueDate"), "2026-11", EMPTY_DEFAULTS)).toBe("2026-11-25");
   });
 
-  it("lets user-configured defaults win over built-ins", () => {
-    const d = withBuiltinDefaults("payments", {
-      fields: { kiraAmount: "40000" },
-      creditCards: {},
-    });
-    expect(d.fields.kiraAmount).toBe("40000");
-    expect(d.fields.ofisKiraAmount).toBe(12000);
+  it("never applies built-ins to months before they were introduced", () => {
+    expect(fieldDefault(field("kiraAmount"), "2026-10", EMPTY_DEFAULTS)).toBeUndefined();
+    expect(fieldDefault(field("ofisKiraDueDate"), "2026-08", EMPTY_DEFAULTS)).toBeUndefined();
+    expect(computeItemsTotal(payments, emptyMonthState(), EMPTY_DEFAULTS, "2026-08")).toBe(0);
   });
 
-  it("counts both rents in the outgoing total for a blank month", () => {
-    const d = withBuiltinDefaults("payments", EMPTY_DEFAULTS);
-    expect(computeItemsTotal(CHECKLISTS.payments.items, emptyMonthState(), d, "2026-11")).toBe(50000);
+  it("counts both rents in the outgoing total for a blank month after the split", () => {
+    expect(computeItemsTotal(payments, emptyMonthState(), EMPTY_DEFAULTS, "2026-11")).toBe(50000);
   });
 
-  it("adds nothing for invoices", () => {
-    expect(withBuiltinDefaults("invoices", EMPTY_DEFAULTS)).toEqual(EMPTY_DEFAULTS);
+  it("lets user-configured defaults win, including a deliberate blank", () => {
+    const defaults = { fields: { kiraAmount: "40000", ofisKiraAmount: "" }, creditCards: {} };
+    expect(fieldDefault(field("kiraAmount"), "2026-11", defaults)).toBe("40000");
+    expect(fieldDefault(field("ofisKiraAmount"), "2026-11", defaults)).toBeUndefined();
+  });
+
+  it("ignores defaults for per-month-only fields like the report sent date", () => {
+    const sent = CHECKLISTS.report.items.flatMap((i) => i.fields).find((f) => f.key === "reportSentDate")!;
+    expect(sent.noDefault).toBe(true);
+    expect(fieldDefault(sent, "2026-11", { fields: { reportSentDate: "1" }, creditCards: {} })).toBeUndefined();
   });
 });
 
