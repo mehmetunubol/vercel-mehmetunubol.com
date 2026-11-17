@@ -246,7 +246,12 @@ const REPORT_ITEMS: ChecklistItemDef[] = [
     index: 9,
     title: "Send all to accountant (1st of next month)",
     icon: "send",
-    fields: [{ key: "reportSentDate", label: "Date sent", type: "date" }],
+    // accountantEmail is the "To" of the Gmail draft — set it once in the
+    // Defaults panel and every month picks it up.
+    fields: [
+      { key: "accountantEmail", label: "Accountant email", type: "text" },
+      { key: "reportSentDate", label: "Date sent", type: "date" },
+    ],
     hasFile: false,
   },
 ];

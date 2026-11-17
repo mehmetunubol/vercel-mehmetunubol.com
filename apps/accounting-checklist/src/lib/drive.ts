@@ -203,6 +203,24 @@ export async function upsertSummaryDoc(
   return { id: created.data.id, webViewLink: created.data.webViewLink };
 }
 
+// Only works for files this app created (drive.file scope) — which is
+// every attachment uploaded through the checklist UI.
+export async function downloadFile(
+  accessToken: string,
+  fileId: string,
+): Promise<{ name: string; mimeType: string; size: number; data: Buffer }> {
+  const drive = driveClient(accessToken);
+  const meta = await drive.files.get({ fileId, fields: "name, mimeType, size" });
+  const content = await drive.files.get({ fileId, alt: "media" }, { responseType: "arraybuffer" });
+  const data = Buffer.from(content.data as ArrayBuffer);
+  return {
+    name: meta.data.name ?? fileId,
+    mimeType: meta.data.mimeType ?? "application/octet-stream",
+    size: data.length,
+    data,
+  };
+}
+
 export async function uploadFile(
   accessToken: string,
   monthFolderId: string,

@@ -57,7 +57,7 @@ describe("report checklist", () => {
     expect(new Set(indexes).size).toBe(indexes.length);
     expect(items).toHaveLength(9);
     expect(items.slice(0, 8).every((i) => i.hasFile)).toBe(true);
-    expect(items.at(-1)?.fields.map((f) => f.key)).toEqual(["reportSentDate"]);
+    expect(items.at(-1)?.fields.map((f) => f.key)).toEqual(["accountantEmail", "reportSentDate"]);
   });
 
   it("contributes nothing to totals", () => {

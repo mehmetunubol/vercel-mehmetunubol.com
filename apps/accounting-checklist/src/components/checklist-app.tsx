@@ -27,6 +27,10 @@ export function ChecklistApp() {
   const [showDefaults, setShowDefaults] = useState(false);
   const [month, setMonth] = useState(() => currentMonthKey());
   const [generatingSummary, setGeneratingSummary] = useState(false);
+  const [creatingDraft, setCreatingDraft] = useState(false);
+  const [draftNotice, setDraftNotice] = useState<{ tone: "ok" | "error"; text: string; href?: string } | null>(
+    null,
+  );
   const [invoicesState, setInvoicesState] = useState<ChecklistState | null>(null);
 
   useEffect(() => {
@@ -235,6 +239,68 @@ export function ChecklistApp() {
     }
   }
 
+  async function handleCreateDraft() {
+    // Flush any debounced edit (e.g. a just-typed accountant email) so the
+    // server reads the same state the user sees.
+    if (stateWriteTimer.current && pendingStateRef.current) {
+      clearTimeout(stateWriteTimer.current);
+      stateWriteTimer.current = null;
+      const toSend = pendingStateRef.current;
+      pendingStateRef.current = null;
+      await fetch(`/api/state?checklist=${checklist}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(toSend),
+      });
+    }
+
+    const missing = items
+      .filter((def) => def.hasFile && !monthState.files.some((f) => f.itemIndex === def.index))
+      .map((def) => `• ${def.title}`);
+    if (
+      missing.length > 0 &&
+      !window.confirm(`These documents aren't uploaded yet:\n\n${missing.join("\n")}\n\nCreate the draft anyway?`)
+    ) {
+      return;
+    }
+
+    setCreatingDraft(true);
+    setDraftNotice(null);
+    try {
+      const response = await fetch("/api/report-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ month }),
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        gmailUrl?: string;
+        attachedCount?: number;
+        linkedCount?: number;
+        to?: string | null;
+      };
+
+      if (!response.ok) {
+        const text =
+          result.error === "gmail_scope"
+            ? "Gmail access isn't granted yet — sign out and sign back in once to allow creating drafts."
+            : result.error === "no_files"
+              ? "Nothing uploaded for this month yet."
+              : "Couldn't create the Gmail draft. Try again.";
+        setDraftNotice({ tone: "error", text });
+        return;
+      }
+
+      const parts = [`Draft created with ${result.attachedCount} attachment(s)`];
+      if (result.linkedCount) parts.push(`${result.linkedCount} too large, added as Drive links`);
+      if (!result.to) parts.push("no recipient set — add the accountant email in Defaults");
+      setDraftNotice({ tone: "ok", text: `${parts.join(" · ")}.`, href: result.gmailUrl });
+      if (result.gmailUrl) window.open(result.gmailUrl, "_blank");
+    } finally {
+      setCreatingDraft(false);
+    }
+  }
+
   const allDone = doneCount === items.length;
 
   const invoicesMonthState = invoicesState?.months?.[month];
@@ -293,8 +359,40 @@ export function ChecklistApp() {
           >
             {generatingSummary ? "Generating…" : "Print summary"}
           </button>
+          {checklist === "report" ? (
+            <button
+              type="button"
+              onClick={handleCreateDraft}
+              disabled={creatingDraft}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground transition-opacity duration-150 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:pointer-events-none disabled:opacity-50"
+            >
+              {creatingDraft ? "Preparing draft…" : "Email to accountant"}
+            </button>
+          ) : null}
         </div>
       </div>
+      {checklist === "report" && draftNotice ? (
+        <div
+          role="status"
+          className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border px-3 py-2 text-sm ${
+            draftNotice.tone === "ok"
+              ? "border-accent/30 bg-accent/5"
+              : "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"
+          }`}
+        >
+          <span>{draftNotice.text}</span>
+          {draftNotice.href ? (
+            <a
+              href={draftNotice.href}
+              target="_blank"
+              rel="noreferrer"
+              className="text-accent underline decoration-accent/30 underline-offset-2 hover:decoration-accent"
+            >
+              Open in Gmail
+            </a>
+          ) : null}
+        </div>
+      ) : null}
       {showDefaults ? (
         <DefaultsPanel
           def={CHECKLISTS[checklist]}
