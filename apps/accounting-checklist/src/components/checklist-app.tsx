@@ -19,30 +19,8 @@ import {
   type MonthState,
   type RepeatableKey,
 } from "@/lib/checklist";
-
-type PendingRefs<T> = {
-  timer: { current: ReturnType<typeof setTimeout> | null };
-  pending: { current: T | null };
-};
-
-// Sends a debounced write right away (or does nothing if none is queued).
-// Used both by the debounce timers and to flush before actions that make
-// the server read state — returns false if the save failed.
-async function flushPending<T>({ timer, pending }: PendingRefs<T>, url: string): Promise<boolean> {
-  if (timer.current) {
-    clearTimeout(timer.current);
-    timer.current = null;
-  }
-  const toSend = pending.current;
-  pending.current = null;
-  if (!toSend) return true;
-  const response = await fetch(url, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(toSend),
-  }).catch(() => null);
-  return Boolean(response?.ok);
-}
+import { createWriteQueue, enqueueWrite, flushWrites } from "@/lib/write-queue";
+import { planReportEmail } from "@/lib/report-email";
 
 const GMAIL_ERROR_MESSAGES: Record<string, string> = {
   gmail_scope: "Gmail access isn't granted yet — sign out and sign back in once to allow creating drafts.",
@@ -92,35 +70,34 @@ export function ChecklistApp() {
   }, [checklist, month]);
 
   function selectChecklist(key: ChecklistKey) {
+    // Send any edits for the checklist being left right away (each write is
+    // bound to its own checklist's URL, so this is about promptness).
+    void flushWrites(stateWrites.current);
+    void flushWrites(defaultsWrites.current);
     setState(null);
     setDefaults(EMPTY_DEFAULTS);
     setChecklist(key);
   }
 
-  // Debounced so rapid edits (e.g. fast typing) collapse into one PATCH
-  // instead of firing a request per keystroke — overlapping requests could
-  // otherwise race Drive's find-or-create-by-name check and each create a
-  // duplicate file, since Drive allows multiple files with the same name.
-  const defaultsWriteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingDefaultsRef = useRef<ChecklistDefaults | null>(null);
+  // Debounced, ordered writes — see lib/write-queue.ts.
+  const defaultsWrites = useRef(createWriteQueue<ChecklistDefaults>());
+  const stateWrites = useRef(createWriteQueue<ChecklistState>());
 
   const persistDefaults = useCallback(
     (next: ChecklistDefaults) => {
       setDefaults(next);
-      pendingDefaultsRef.current = next;
-      if (defaultsWriteTimer.current) clearTimeout(defaultsWriteTimer.current);
-      defaultsWriteTimer.current = setTimeout(() => {
-        void flushPending(
-          { timer: defaultsWriteTimer, pending: pendingDefaultsRef },
-          `/api/defaults?checklist=${checklist}`,
-        );
-      }, 700);
+      enqueueWrite(defaultsWrites.current, `/api/defaults?checklist=${checklist}`, next);
     },
     [checklist],
   );
 
   function handleFieldDefaultChange(key: string, value: string) {
-    void persistDefaults({ ...defaults, fields: { ...defaults.fields, [key]: value } });
+    // Clearing a field removes the key, so the field falls back to its
+    // built-in default (if any) instead of storing a blank override.
+    const fields = { ...defaults.fields };
+    if (value === "") delete fields[key];
+    else fields[key] = value;
+    void persistDefaults({ ...defaults, fields });
   }
 
   function handleCreditCardDefaultChange(cardId: string, patch: { amount?: string; dueDate?: string }) {
@@ -133,18 +110,10 @@ export function ChecklistApp() {
     });
   }
 
-  // Same debouncing rationale as persistDefaults above.
-  const stateWriteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingStateRef = useRef<ChecklistState | null>(null);
-
   const persist = useCallback(
     (next: ChecklistState) => {
       setState(next);
-      pendingStateRef.current = next;
-      if (stateWriteTimer.current) clearTimeout(stateWriteTimer.current);
-      stateWriteTimer.current = setTimeout(() => {
-        void flushPending({ timer: stateWriteTimer, pending: pendingStateRef }, `/api/state?checklist=${checklist}`);
-      }, 700);
+      enqueueWrite(stateWrites.current, `/api/state?checklist=${checklist}`, next);
     },
     [checklist],
   );
@@ -265,9 +234,7 @@ export function ChecklistApp() {
   }
 
   async function handleCreateDraft() {
-    const missing = items
-      .filter((def) => def.hasFile && !monthState.files.some((f) => f.itemIndex === def.index))
-      .map((def) => `• ${def.title}`);
+    const missing = planReportEmail(items, monthState, month).missing.map((title) => `• ${title}`);
     if (
       missing.length > 0 &&
       !window.confirm(`These documents aren't uploaded yet:\n\n${missing.join("\n")}\n\nCreate the draft anyway?`)
@@ -279,7 +246,12 @@ export function ChecklistApp() {
     // a window.open after the awaits below would be popup-blocked. It's
     // pointed at the draft once it exists, or closed on failure.
     const draftWindow = window.open("", "_blank");
-    draftWindow?.document.write("<p style='font-family:sans-serif'>Preparing Gmail draft…</p>");
+    if (draftWindow) {
+      // Sever the back-reference before it navigates anywhere, so pages
+      // later opened in that tab can't redirect this one (tabnabbing).
+      draftWindow.opener = null;
+      draftWindow.document.write("<p style='font-family:sans-serif'>Preparing Gmail draft…</p>");
+    }
 
     const draftMonth = month;
     setCreatingDraft(true);
@@ -287,9 +259,10 @@ export function ChecklistApp() {
     try {
       // Flush both debounced writes (e.g. an accountant email just typed in
       // the month or in Defaults) so the server reads what the user sees.
+      // Also waits for a save that's already on its way to Drive.
       const [stateSaved, defaultsSaved] = await Promise.all([
-        flushPending({ timer: stateWriteTimer, pending: pendingStateRef }, `/api/state?checklist=${checklist}`),
-        flushPending({ timer: defaultsWriteTimer, pending: pendingDefaultsRef }, `/api/defaults?checklist=${checklist}`),
+        flushWrites(stateWrites.current),
+        flushWrites(defaultsWrites.current),
       ]);
       if (!stateSaved || !defaultsSaved) {
         draftWindow?.close();

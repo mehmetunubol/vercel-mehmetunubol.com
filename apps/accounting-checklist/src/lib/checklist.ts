@@ -407,11 +407,13 @@ export function resolveFieldDefault(
 
 export const checklistDefaultsInputSchema = checklistDefaultsSchema;
 
-// The single place a field's default is resolved, for the UI, totals and
-// printed summary alike: the user's configured default wins (even "", which
-// means "deliberately no default"); otherwise the field's built-in default,
-// but only from the month it was introduced. Built-ins are never written to
-// defaults.json, so changing one in code takes effect everywhere.
+// The single place a field's default is resolved, for the UI, totals,
+// printed summary and email alike: the user's configured default wins;
+// otherwise the field's built-in default, but only from the month it was
+// introduced. A blank configured value counts as "not configured" — so
+// clearing a field in the Defaults panel brings the built-in back, exactly
+// as its placeholder says (enter 0 to really have no amount). Built-ins
+// are never written to defaults.json, so changing one in code takes effect.
 export function fieldDefault(
   field: ChecklistFieldDef,
   monthKey: string,
@@ -419,7 +421,7 @@ export function fieldDefault(
 ): string | number | undefined {
   if (field.noDefault) return undefined;
   const configured = Object.hasOwn(defaults.fields, field.key) ? defaults.fields[field.key] : undefined;
-  if (configured !== undefined) return resolveFieldDefault(field.type, monthKey, configured);
+  if (configured !== undefined && configured !== "") return resolveFieldDefault(field.type, monthKey, configured);
   const builtin = field.builtinDefault;
   if (builtin && monthKey >= builtin.since) return resolveFieldDefault(field.type, monthKey, builtin.value);
   return undefined;

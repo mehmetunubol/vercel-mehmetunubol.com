@@ -87,10 +87,15 @@ describe("fieldDefault (built-in defaults)", () => {
     expect(computeItemsTotal(payments, emptyMonthState(), EMPTY_DEFAULTS, "2026-11")).toBe(50000);
   });
 
-  it("lets user-configured defaults win, including a deliberate blank", () => {
-    const defaults = { fields: { kiraAmount: "40000", ofisKiraAmount: "" }, creditCards: {} };
+  it("lets user-configured defaults win, including an explicit 0", () => {
+    const defaults = { fields: { kiraAmount: "40000", ofisKiraAmount: "0" }, creditCards: {} };
     expect(fieldDefault(field("kiraAmount"), "2026-11", defaults)).toBe("40000");
-    expect(fieldDefault(field("ofisKiraAmount"), "2026-11", defaults)).toBeUndefined();
+    expect(fieldDefault(field("ofisKiraAmount"), "2026-11", defaults)).toBe("0");
+  });
+
+  it("falls back to the built-in when a configured default is cleared", () => {
+    const defaults = { fields: { kiraAmount: "" }, creditCards: {} };
+    expect(fieldDefault(field("kiraAmount"), "2026-11", defaults)).toBe(38000);
   });
 
   it("ignores defaults for per-month-only fields like the report sent date", () => {

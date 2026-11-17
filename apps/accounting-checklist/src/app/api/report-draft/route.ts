@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getDriveAccessToken } from "@/lib/auth";
 import { downloadFile, getOrCreateChecklistFolder, readDefaults, readState } from "@/lib/drive";
-import { CHECKLISTS, emptyMonthState } from "@/lib/checklist";
+import { CHECKLISTS, emptyMonthState, fieldDefault } from "@/lib/checklist";
 import { buildMimeMessage, createGmailDraft, GmailDraftError, type MailAttachment } from "@/lib/gmail";
 import {
   MAX_ATTACHMENT_BYTES,
@@ -62,7 +62,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const to = normalizeRecipient(monthState.fields.accountantEmail ?? defaults.fields.accountantEmail);
+  // Same resolution as the on-screen field: this month's value, else the
+  // configured default.
+  const emailField = def.items.flatMap((i) => i.fields).find((f) => f.key === "accountantEmail");
+  const to = normalizeRecipient(
+    monthState.fields.accountantEmail ?? (emailField ? fieldDefault(emailField, month, defaults) : undefined),
+  );
   const mime = buildMimeMessage({
     to,
     subject: plan.subject,
@@ -77,7 +82,6 @@ export async function POST(req: NextRequest) {
       gmailUrl: `https://mail.google.com/mail/u/0/#drafts?compose=${messageId}`,
       attachedCount: attached.length,
       linkedCount: linked.length,
-      missing: plan.missing,
       to: to ?? null,
     });
   } catch (error) {
