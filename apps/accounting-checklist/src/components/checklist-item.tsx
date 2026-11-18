@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui";
 import {
   DEFAULT_CREDIT_CARDS,
   resolveDateDefault,
-  resolveFieldDefault,
+  fieldDefault,
   type ChecklistDefaults,
   type ChecklistItemDef,
   type CustomExpense,
@@ -204,7 +204,7 @@ export function ChecklistItem({
                 type={field.type}
                 value={
                   monthState.fields[field.key] ??
-                  resolveFieldDefault(field.type, month, defaults.fields[field.key]) ??
+                  fieldDefault(field, month, defaults) ??
                   ""
                 }
                 onChange={(e) => onFieldChange(field.key, e.target.value)}

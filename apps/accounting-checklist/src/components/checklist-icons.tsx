@@ -10,6 +10,12 @@ export type ItemIconName =
   | "home"
   | "heart"
   | "building"
+  | "office"
+  | "bolt"
+  | "droplet"
+  | "wifi"
+  | "phone"
+  | "send"
   | "plus-circle";
 
 const paths: Record<ItemIconName, string> = {
@@ -24,6 +30,13 @@ const paths: Record<ItemIconName, string> = {
   home: "M4 9.5 10 4l6 5.5V16a1 1 0 0 1-1 1h-3v-4H8v4H5a1 1 0 0 1-1-1z",
   heart: "M10 16.5 4 11a3.5 3.5 0 0 1 5-5l1 1 1-1a3.5 3.5 0 0 1 5 5z",
   building: "M4 17V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v13M14 17v-6h3a1 1 0 0 1 1 1v5M3 17h14M6.5 6h2M6.5 9h2M6.5 12h2",
+  // Desk with a monitor — distinct from "building".
+  office: "M3 15h14M5 15v2M15 15v2M7 4h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM10 11v4",
+  bolt: "M11 2.5 4.5 11H10l-1 6.5L15.5 9H10l1-6.5z",
+  droplet: "M10 2.5S4.5 8.6 4.5 12a5.5 5.5 0 0 0 11 0C15.5 8.6 10 2.5 10 2.5z",
+  wifi: "M3 8a10 10 0 0 1 14 0M5.5 10.8a6.5 6.5 0 0 1 9 0M8 13.5a3 3 0 0 1 4 0M10 16.2v.1",
+  phone: "M7 2.5h6a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM9 15h2",
+  send: "M17 3 3 9l5.5 2.5L11 17l6-14zM8.5 11.5 17 3",
   "plus-circle": "M10 3.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM10 7v6M7 10h6",
 };
 

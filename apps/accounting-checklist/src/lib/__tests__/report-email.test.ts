@@ -1,0 +1,121 @@
+import { describe, expect, it } from "vitest";
+import { CHECKLISTS, emptyMonthState } from "@/lib/checklist";
+import { buildMimeMessage, classifyGmailError, encodeHeaderValue } from "@/lib/gmail";
+import {
+  buildReportBody,
+  normalizeRecipient,
+  planReportEmail,
+  turkishMonthLabel,
+} from "@/lib/report-email";
+
+describe("turkishMonthLabel", () => {
+  it("renders the month in Turkish", () => {
+    expect(turkishMonthLabel("2026-11")).toBe("Kasım 2026");
+    expect(turkishMonthLabel("2026-08")).toBe("Ağustos 2026");
+  });
+});
+
+describe("planReportEmail", () => {
+  it("collects uploaded files and lists items still missing a document", () => {
+    const monthState = {
+      ...emptyMonthState(),
+      files: [
+        { itemIndex: 1, driveFileId: "a", name: "bro.pdf", webViewLink: "https://drive/a" },
+        { itemIndex: 3, driveFileId: "b", name: "fiba.pdf", webViewLink: "https://drive/b" },
+      ],
+    };
+    const plan = planReportEmail(CHECKLISTS.report.items, monthState, "2026-11");
+    expect(plan.subject).toBe("Kasım 2026 muhasebe evrakları");
+    expect(plan.files.map((f) => f.driveFileId)).toEqual(["a", "b"]);
+    expect(plan.missing).toHaveLength(6);
+    expect(plan.missing).not.toContain("Invoice — Bro");
+    // The send step has no document, so it's never "missing".
+    expect(plan.missing.some((m) => m.startsWith("Send all"))).toBe(false);
+  });
+});
+
+describe("buildReportBody", () => {
+  it("lists attachments and falls back to Drive links for oversized files", () => {
+    const body = buildReportBody(
+      "2026-11",
+      [{ itemTitle: "Invoice — Bro", name: "bro.pdf" }],
+      [{ itemTitle: "Bank", name: "big.pdf", webViewLink: "https://drive/x" }],
+    );
+    expect(body).toContain("Kasım 2026 ayına ait evraklar ektedir");
+    expect(body).toContain("- Invoice — Bro: bro.pdf");
+    expect(body).toContain("https://drive/x");
+  });
+});
+
+describe("normalizeRecipient", () => {
+  it("accepts a plain address and rejects anything else", () => {
+    expect(normalizeRecipient("  muhasebe@example.com ")).toBe("muhasebe@example.com");
+    expect(normalizeRecipient("a@b.com\r\nBcc: evil@x.com")).toBeUndefined();
+    expect(normalizeRecipient("not an email")).toBeUndefined();
+    expect(normalizeRecipient(undefined)).toBeUndefined();
+  });
+});
+
+describe("buildMimeMessage", () => {
+  it("encodes non-ASCII headers and attaches files as base64", () => {
+    const mime = buildMimeMessage(
+      {
+        to: "muhasebe@example.com",
+        subject: "Kasım 2026 muhasebe evrakları",
+        body: "Merhaba",
+        attachments: [{ filename: "Fiba şahıs.pdf", mimeType: "application/pdf", data: Buffer.from("PDF") }],
+      },
+      "BOUNDARY",
+    );
+    expect(mime).toContain("To: muhasebe@example.com");
+    expect(mime).toContain(`Subject: ${encodeHeaderValue("Kasım 2026 muhasebe evrakları")}`);
+    expect(mime).toContain('boundary="BOUNDARY"');
+    expect(mime).toContain("filename*=UTF-8''Fiba%20%C5%9Fah%C4%B1s.pdf");
+    expect(mime).not.toMatch(/filename="/);
+    expect(mime).toContain(Buffer.from("PDF").toString("base64"));
+    expect(mime.trimEnd().endsWith("--BOUNDARY--")).toBe(true);
+  });
+
+  it("omits the To header when no recipient is set", () => {
+    const mime = buildMimeMessage({ subject: "x", body: "y", attachments: [] }, "B");
+    expect(mime).not.toMatch(/^To:/m);
+  });
+
+  it("strips CR/LF from header values", () => {
+    expect(encodeHeaderValue("a\r\nBcc: x")).toBe("a Bcc: x");
+  });
+});
+
+describe("encodeHeaderValue", () => {
+  it("keeps every encoded-word within the RFC 2047 75-char limit and folds them", () => {
+    const long = "Fiba şahıs hesap ekstresi Kasım 2026 — tüm hareketler ve açıklamalar.pdf";
+    const encoded = encodeHeaderValue(long);
+    const words = encoded.split(/\r\n /);
+    expect(words.length).toBeGreaterThan(1);
+    for (const word of words) expect(word.length).toBeLessThanOrEqual(75);
+    const decoded = words
+      .map((w) => Buffer.from(w.replace(/^=\?UTF-8\?B\?|\?=$/g, ""), "base64").toString("utf8"))
+      .join("");
+    expect(decoded).toBe(long);
+  });
+});
+
+describe("classifyGmailError", () => {
+  const apiError = (status: number, reason?: string, message = "") => ({
+    response: { status, data: { error: { message, errors: reason ? [{ reason }] : [] } } },
+  });
+
+  it("distinguishes why Gmail refused", () => {
+    expect(classifyGmailError(apiError(403, "insufficientPermissions"))).toBe("scope");
+    expect(classifyGmailError(apiError(403, "accessNotConfigured"))).toBe("api_disabled");
+    expect(classifyGmailError(apiError(403, "rateLimitExceeded"))).toBe("rate_limit");
+    expect(classifyGmailError(apiError(429))).toBe("rate_limit");
+    expect(classifyGmailError(apiError(401))).toBe("auth");
+  });
+
+  it("doesn't blame missing scopes for unrelated failures", () => {
+    expect(classifyGmailError(apiError(403, "forbidden"))).toBeNull();
+    expect(classifyGmailError(apiError(500))).toBeNull();
+    expect(classifyGmailError(new Error("network down"))).toBeNull();
+  });
+});

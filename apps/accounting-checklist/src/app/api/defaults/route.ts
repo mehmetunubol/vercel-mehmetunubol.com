@@ -14,6 +14,8 @@ export async function GET(req: NextRequest) {
 
   const folderId = await getOrCreateChecklistFolder(accessToken, checklist);
   const defaults = await readDefaults(accessToken, folderId);
+  // Stored values only — built-ins are resolved per field via fieldDefault,
+  // so they never round-trip back into defaults.json on the next PATCH.
   return NextResponse.json(defaults);
 }
 

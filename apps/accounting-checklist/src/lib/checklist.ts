@@ -3,18 +3,33 @@ import type { ItemIconName } from "@/components/checklist-icons";
 
 export type RepeatableKey = "customExpenses" | "creditCards";
 
+export type ChecklistFieldDef = {
+  key: string;
+  label: string;
+  type: "text" | "number" | "date";
+  // Fallback used when the user hasn't configured a default for this key.
+  // Only applies to months >= `since` (YYYY-MM), so introducing one never
+  // rewrites past months' values or totals. Dates are a day of month.
+  builtinDefault?: { value: string | number; since: string };
+  // Values that must be entered per month (e.g. "date sent") — no default
+  // can be configured, since a pre-filled value would be misleading.
+  noDefault?: boolean;
+};
+
 export type ChecklistItemDef = {
   index: number;
   title: string;
   icon: ItemIconName;
-  fields: { key: string; label: string; type: "text" | "number" | "date" }[];
+  fields: ChecklistFieldDef[];
   hasFile: boolean;
   fileLabel?: string;
   repeatableKey?: RepeatableKey;
   addEntryLabel?: string;
+  // Turkish name used in the accountant email (Report checklist).
+  emailLabel?: string;
 };
 
-export type ChecklistKey = "invoices" | "payments";
+export type ChecklistKey = "invoices" | "payments" | "report";
 
 export type ChecklistDef = {
   key: ChecklistKey;
@@ -89,7 +104,11 @@ export const DEFAULT_CREDIT_CARDS: { id: string; label: string }[] = [
   { id: "card-denizbank", label: "Denizbank" },
   { id: "card-yapikredi", label: "Yapı Kredi" },
   { id: "card-enpara", label: "Enpara" },
+  { id: "card-vakifbank", label: "Vakıfbank" },
 ];
+
+// First month the home/office rent split (and its built-in amounts) applies.
+const RENT_SPLIT_MONTH = "2026-11";
 
 // Temporary/placeholder steps — to be refined later.
 const PAYMENT_ITEMS: ChecklistItemDef[] = [
@@ -124,13 +143,28 @@ const PAYMENT_ITEMS: ChecklistItemDef[] = [
     hasFile: true,
     fileLabel: "Receipt",
   },
+  // Home rent keeps the original "kira*" keys and index 4 so months saved
+  // before the home/office split stay attached to it. Office rent got a new,
+  // unused index (8) rather than renumbering — `index` is a persisted id
+  // (done flags, file attachments), not a display position.
   {
     index: 4,
-    title: "Rent (kira)",
+    title: "Rent — home (ev kirası)",
     icon: "home",
     fields: [
-      { key: "kiraAmount", label: "Amount", type: "number" },
-      { key: "kiraDueDate", label: "Due date", type: "date" },
+      { key: "kiraAmount", label: "Amount", type: "number", builtinDefault: { value: 38000, since: RENT_SPLIT_MONTH } },
+      { key: "kiraDueDate", label: "Due date", type: "date", builtinDefault: { value: 15, since: RENT_SPLIT_MONTH } },
+    ],
+    hasFile: true,
+    fileLabel: "Receipt",
+  },
+  {
+    index: 8,
+    title: "Rent — office (ofis kirası)",
+    icon: "office",
+    fields: [
+      { key: "ofisKiraAmount", label: "Amount", type: "number", builtinDefault: { value: 12000, since: RENT_SPLIT_MONTH } },
+      { key: "ofisKiraDueDate", label: "Due date", type: "date", builtinDefault: { value: 25, since: RENT_SPLIT_MONTH } },
     ],
     hasFile: true,
     fileLabel: "Receipt",
@@ -146,17 +180,8 @@ const PAYMENT_ITEMS: ChecklistItemDef[] = [
     hasFile: true,
     fileLabel: "Receipt",
   },
-  {
-    index: 6,
-    title: "Seferihisar dues (aidat)",
-    icon: "building",
-    fields: [
-      { key: "seferihisarAidatAmount", label: "Amount", type: "number" },
-      { key: "seferihisarAidatDueDate", label: "Due date", type: "date" },
-    ],
-    hasFile: true,
-    fileLabel: "Receipt",
-  },
+  // index 6 (Seferihisar dues) was removed — don't reuse it, old months'
+  // state.json may still carry a done flag / files under that index.
   {
     index: 7,
     title: "Custom expenses",
@@ -165,6 +190,95 @@ const PAYMENT_ITEMS: ChecklistItemDef[] = [
     hasFile: false,
     repeatableKey: "customExpenses",
     addEntryLabel: "Add expense",
+  },
+];
+
+// Monthly document pack for the accountant: collect every document for the
+// month, then send it all together on the 1st of the following month.
+const REPORT_ITEMS: ChecklistItemDef[] = [
+  {
+    index: 1,
+    title: "Invoice — Bro",
+    emailLabel: "Fatura — Bro",
+    icon: "receipt",
+    fields: [],
+    hasFile: true,
+    fileLabel: "Bro faturası",
+  },
+  {
+    index: 2,
+    title: "Invoice — Deparsoft",
+    emailLabel: "Fatura — Deparsoft",
+    icon: "receipt",
+    fields: [],
+    hasFile: true,
+    fileLabel: "Deparsoft faturası",
+  },
+  {
+    index: 3,
+    title: "Bank account transactions — Fiba (şahıs)",
+    emailLabel: "Banka hesap hareketleri — Fiba (şahıs)",
+    icon: "bank",
+    fields: [],
+    hasFile: true,
+    fileLabel: "Fiba şahıs hesap hareketleri",
+  },
+  {
+    index: 4,
+    title: "Office rent payment proof",
+    emailLabel: "Ofis kirası ödeme dekontu",
+    icon: "office",
+    fields: [],
+    hasFile: true,
+    fileLabel: "Ofis kirası dekontu",
+  },
+  {
+    index: 5,
+    title: "Paid invoice — Electricity (elektrik)",
+    emailLabel: "Ödenen fatura — Elektrik",
+    icon: "bolt",
+    fields: [],
+    hasFile: true,
+    fileLabel: "Elektrik faturası",
+  },
+  {
+    index: 6,
+    title: "Paid invoice — Water (su)",
+    emailLabel: "Ödenen fatura — Su",
+    icon: "droplet",
+    fields: [],
+    hasFile: true,
+    fileLabel: "Su faturası",
+  },
+  {
+    index: 7,
+    title: "Paid invoice — Internet",
+    emailLabel: "Ödenen fatura — İnternet",
+    icon: "wifi",
+    fields: [],
+    hasFile: true,
+    fileLabel: "İnternet faturası",
+  },
+  {
+    index: 8,
+    title: "Paid invoice — Mobile phone (cep telefonu)",
+    emailLabel: "Ödenen fatura — Cep telefonu",
+    icon: "phone",
+    fields: [],
+    hasFile: true,
+    fileLabel: "Cep telefonu faturası",
+  },
+  {
+    index: 9,
+    title: "Send all to accountant (1st of next month)",
+    icon: "send",
+    // accountantEmail is the "To" of the Gmail draft — set it once in the
+    // Defaults panel and every month picks it up.
+    fields: [
+      { key: "accountantEmail", label: "Accountant email", type: "text" },
+      { key: "reportSentDate", label: "Date sent", type: "date", noDefault: true },
+    ],
+    hasFile: false,
   },
 ];
 
@@ -181,9 +295,15 @@ export const CHECKLISTS: Record<ChecklistKey, ChecklistDef> = {
     driveFolder: "Payments",
     items: PAYMENT_ITEMS,
   },
+  report: {
+    key: "report",
+    title: "Report",
+    driveFolder: "Report",
+    items: REPORT_ITEMS,
+  },
 };
 
-export const CHECKLIST_KEYS: ChecklistKey[] = ["invoices", "payments"];
+export const CHECKLIST_KEYS: ChecklistKey[] = ["invoices", "payments", "report"];
 
 export function isChecklistKey(value: unknown): value is ChecklistKey {
   return typeof value === "string" && (CHECKLIST_KEYS as string[]).includes(value);
@@ -297,9 +417,29 @@ export function resolveFieldDefault(
 
 export const checklistDefaultsInputSchema = checklistDefaultsSchema;
 
+// The single place a field's default is resolved, for the UI, totals,
+// printed summary and email alike: the user's configured default wins;
+// otherwise the field's built-in default, but only from the month it was
+// introduced. A blank configured value counts as "not configured" — so
+// clearing a field in the Defaults panel brings the built-in back, exactly
+// as its placeholder says (enter 0 to really have no amount). Built-ins
+// are never written to defaults.json, so changing one in code takes effect.
+export function fieldDefault(
+  field: ChecklistFieldDef,
+  monthKey: string,
+  defaults: ChecklistDefaults,
+): string | number | undefined {
+  if (field.noDefault) return undefined;
+  const configured = Object.hasOwn(defaults.fields, field.key) ? defaults.fields[field.key] : undefined;
+  if (configured !== undefined && configured !== "") return resolveFieldDefault(field.type, monthKey, configured);
+  const builtin = field.builtinDefault;
+  if (builtin && monthKey >= builtin.since) return resolveFieldDefault(field.type, monthKey, builtin.value);
+  return undefined;
+}
+
 // Sums every numeric field/entry across a checklist's items for one month —
 // used to total up "outgoing" payments, including default-filled blanks
-// (defaults + resolveFieldDefault) so the total matches what the UI shows.
+// (fieldDefault) so the total matches what the UI shows.
 export function computeItemsTotal(
   items: ChecklistItemDef[],
   monthState: MonthState,
@@ -311,7 +451,7 @@ export function computeItemsTotal(
   for (const item of items) {
     for (const field of item.fields) {
       if (field.type !== "number") continue;
-      const raw = monthState.fields[field.key] ?? resolveFieldDefault(field.type, monthKey, defaults.fields[field.key]);
+      const raw = monthState.fields[field.key] ?? fieldDefault(field, monthKey, defaults);
       const num = Number(raw);
       if (raw !== undefined && raw !== "" && !Number.isNaN(num)) total += num;
     }

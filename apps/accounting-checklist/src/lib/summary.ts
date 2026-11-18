@@ -1,5 +1,5 @@
 import type { ChecklistDef, ChecklistDefaults, CustomExpense, MonthState } from "@/lib/checklist";
-import { DEFAULT_CREDIT_CARDS, resolveDateDefault, resolveFieldDefault } from "@/lib/checklist";
+import { DEFAULT_CREDIT_CARDS, fieldDefault, resolveDateDefault } from "@/lib/checklist";
 
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -57,7 +57,7 @@ export function buildSummaryHtml(
         .map((f) => {
           const value =
             monthState.fields[f.key] ??
-            resolveFieldDefault(f.type, monthLabel, defaults.fields[f.key]) ??
+            fieldDefault(f, monthLabel, defaults) ??
             "";
           return `<div>${escapeHtml(f.label)}: ${escapeHtml(String(value))}</div>`;
         })

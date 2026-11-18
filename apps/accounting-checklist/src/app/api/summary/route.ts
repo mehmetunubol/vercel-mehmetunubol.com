@@ -7,7 +7,12 @@ import {
   readState,
   upsertSummaryDoc,
 } from "@/lib/drive";
-import { CHECKLISTS, computeItemsTotal, emptyMonthState, isChecklistKey } from "@/lib/checklist";
+import {
+  CHECKLISTS,
+  computeItemsTotal,
+  emptyMonthState,
+  isChecklistKey,
+} from "@/lib/checklist";
 import { buildSummaryHtml, type SummaryTotals } from "@/lib/summary";
 
 export async function POST(req: NextRequest) {

@@ -14,7 +14,10 @@ export function DefaultsPanel({
   onFieldDefaultChange: (key: string, value: string) => void;
   onCreditCardDefaultChange: (cardId: string, patch: { amount?: string; dueDate?: string }) => void;
 }) {
-  const itemsWithFields = def.items.filter((item) => item.fields.length > 0);
+  // Per-month-only fields (noDefault) can't be pre-filled, so they're hidden.
+  const itemsWithFields = def.items
+    .map((item) => ({ ...item, fields: item.fields.filter((field) => !field.noDefault) }))
+    .filter((item) => item.fields.length > 0);
   const hasCreditCards = def.items.some((item) => item.repeatableKey === "creditCards");
 
   return (
@@ -41,7 +44,15 @@ export function DefaultsPanel({
                     type={field.type === "date" ? "number" : field.type}
                     min={field.type === "date" ? 1 : undefined}
                     max={field.type === "date" ? 31 : undefined}
-                    placeholder={field.type === "date" ? "e.g. 15" : undefined}
+                    // Built-in defaults show as a hint only — never written back,
+                    // so a code change to them still takes effect.
+                    placeholder={
+                      field.builtinDefault !== undefined
+                        ? `${field.builtinDefault.value} (built-in)`
+                        : field.type === "date"
+                          ? "e.g. 15"
+                          : undefined
+                    }
                     value={defaults.fields[field.key] ?? ""}
                     onChange={(e) => onFieldDefaultChange(field.key, e.target.value)}
                     className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm transition-colors duration-150 focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"

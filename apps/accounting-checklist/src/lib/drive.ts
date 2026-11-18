@@ -203,6 +203,38 @@ export async function upsertSummaryDoc(
   return { id: created.data.id, webViewLink: created.data.webViewLink };
 }
 
+export type DownloadResult =
+  | { kind: "downloaded"; mimeType: string; size: number; data: Buffer }
+  | { kind: "too_large"; size: number };
+
+// Only works for files this app created (drive.file scope) — which is
+// every attachment uploaded through the checklist UI. Checks the size from
+// metadata first, so a file that won't fit in `maxBytes` is never pulled
+// into memory just to be discarded.
+export async function downloadFile(
+  accessToken: string,
+  fileId: string,
+  maxBytes: number,
+): Promise<DownloadResult> {
+  const drive = driveClient(accessToken);
+  const meta = await drive.files.get({ fileId, fields: "mimeType, size" });
+  const declaredSize = meta.data.size ? Number(meta.data.size) : undefined;
+  if (declaredSize !== undefined && declaredSize > maxBytes) {
+    return { kind: "too_large", size: declaredSize };
+  }
+
+  const content = await drive.files.get({ fileId, alt: "media" }, { responseType: "arraybuffer" });
+  const data = Buffer.from(content.data as ArrayBuffer);
+  // Size can be absent from metadata — re-check against the real bytes.
+  if (data.length > maxBytes) return { kind: "too_large", size: data.length };
+  return {
+    kind: "downloaded",
+    mimeType: meta.data.mimeType ?? "application/octet-stream",
+    size: data.length,
+    data,
+  };
+}
+
 export async function uploadFile(
   accessToken: string,
   monthFolderId: string,

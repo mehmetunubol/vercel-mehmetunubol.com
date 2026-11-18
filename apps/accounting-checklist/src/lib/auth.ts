@@ -4,8 +4,16 @@ import { getToken } from "next-auth/jwt";
 import type { NextRequest } from "next/server";
 
 // drive.file scope only — this app can see/manage files *it* creates,
-// never the user's whole Drive.
-const DRIVE_SCOPE = "openid email profile https://www.googleapis.com/auth/drive.file";
+// never the user's whole Drive. gmail.compose lets the Report tab create a
+// draft (with the month's uploads attached) — it can't read the mailbox.
+// Changing this list requires signing out and back in to re-consent.
+const DRIVE_SCOPE = [
+  "openid",
+  "email",
+  "profile",
+  "https://www.googleapis.com/auth/drive.file",
+  "https://www.googleapis.com/auth/gmail.compose",
+].join(" ");
 
 declare module "next-auth/jwt" {
   interface JWT {
