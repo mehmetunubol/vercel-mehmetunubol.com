@@ -1,10 +1,10 @@
 import { and, asc, desc, eq, gt, gte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { messages } from "@/lib/db/schema";
+import { conversationMembers, messageReactions, messages } from "@/lib/db/schema";
 import { deleteExpiredMessages } from "@/lib/cleanup";
 import { getConversation, isMember, isUuid } from "@/lib/conversations";
 import { getMessageTtlHours } from "@/lib/settings";
-import { badRequest, getCurrentUser, unauthorized } from "@/lib/session";
+import { badRequest, forbidden, getCurrentUser, unauthorized } from "@/lib/session";
 import { sendMessageSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +51,29 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             .limit(200)
         ).reverse();
 
-  return Response.json({ messages: rows });
+  // Read state and reactions are small and change on older messages too, so
+  // every poll returns them in full for the conversation.
+  const [reads, reactions] = await Promise.all([
+    db
+      .select({
+        userId: conversationMembers.userId,
+        lastReadAt: conversationMembers.lastReadAt,
+        joinedAt: conversationMembers.joinedAt,
+      })
+      .from(conversationMembers)
+      .where(eq(conversationMembers.conversationId, id)),
+    db
+      .select({
+        messageId: messageReactions.messageId,
+        userId: messageReactions.userId,
+        reaction: messageReactions.reaction,
+      })
+      .from(messageReactions)
+      .innerJoin(messages, eq(messages.id, messageReactions.messageId))
+      .where(and(eq(messages.conversationId, id), live)),
+  ]);
+
+  return Response.json({ messages: rows, reads, reactions });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -60,6 +82,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   const conversation = isUuid(id) ? await getConversation(id) : null;
   if (!conversation || !conversation.members.some((m) => m.id === me.id)) return notFound();
+
+  if (conversation.announcement && !me.isAdmin) return forbidden();
 
   const parsed = sendMessageSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest("invalid message");

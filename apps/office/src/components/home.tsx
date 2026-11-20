@@ -2,21 +2,26 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { MessageCircle, Users } from "lucide-react";
+import { useState, useSyncExternalStore } from "react";
+import { Megaphone, MessageCircle, Users } from "lucide-react";
 import { useApp } from "@/components/app-provider";
 import { Avatar } from "@/components/avatar";
 import { PresenceCard } from "@/components/presence-card";
 import { sinceLabel, timeLabel, ttlLabel } from "@/lib/format";
+import { personPlanLabel, withDuePlan } from "@/lib/plan";
+import type { Person } from "@/lib/types";
 import { ADMIN_USERNAME } from "@/lib/constants";
 
+const noSubscribe = () => () => {};
+
+/** Today's date in the viewer's timezone; rendered only in the browser to avoid a hydration mismatch. */
 function Today() {
-  const today = new Date().toLocaleDateString([], {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
-  return <p className="eyebrow">{today}</p>;
+  const today = useSyncExternalStore(
+    noSubscribe,
+    () => new Date().toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" }),
+    () => "",
+  );
+  return <p className="eyebrow">{today || "\u00a0"}</p>;
 }
 
 export function Home() {
@@ -38,9 +43,12 @@ export function Home() {
     }
   }
 
-  const others = state?.people.filter((p) => p.id !== state.me.id) ?? [];
-  const inCount = state?.people.filter((p) => p.presence === "in").length ?? 0;
-  const admin = state?.people.find((p) => p.username === ADMIN_USERNAME);
+  const people = (state?.people ?? []).map((p) => withDuePlan(p));
+  const inPeople = people.filter((p) => p.presence === "in");
+  const outPeople = people.filter((p) => p.presence === "out");
+  const inCount = inPeople.length;
+  const admin = people.find((p) => p.username === ADMIN_USERNAME);
+  const adminPlan = admin ? personPlanLabel(admin) : null;
   const showAdminBanner = admin && admin.id !== state?.me.id;
 
   return (
@@ -58,13 +66,17 @@ export function Home() {
       </header>
 
       {showAdminBanner ? (
-        <div className="glass rise mb-4 flex items-center gap-3 rounded-full py-2 pr-4 pl-2">
+        <div className="glass rise mb-4 flex items-center gap-3 rounded-[1.6rem] py-2 pr-4 pl-2">
           <Avatar name={admin.displayName} presence={admin.presence} size={34} />
-          <p className="min-w-0 flex-1 truncate text-sm">
+          <p className="line-clamp-2 min-w-0 flex-1 text-sm leading-snug">
             <span className="font-semibold">{admin.displayName}</span>{" "}
             <span className="text-[var(--ink-2)]">
               is {admin.presence === "in" ? "in the office" : "out"}
-              {admin.presenceUpdatedAt ? ` · ${sinceLabel(admin.presenceUpdatedAt)}` : ""}
+              {adminPlan
+                ? ` · ${adminPlan.charAt(0).toLowerCase()}${adminPlan.slice(1)}`
+                : admin.presenceUpdatedAt
+                  ? ` · ${sinceLabel(admin.presenceUpdatedAt)}`
+                  : ""}
             </span>
           </p>
         </div>
@@ -80,35 +92,25 @@ export function Home() {
           className="glass rise rounded-[1.75rem] p-2 md:col-start-1 md:row-start-2"
           style={{ animationDelay: "60ms" }}
         >
-          <h2 className="eyebrow px-3 pt-3 pb-2">People</h2>
-          {state && others.length === 0 ? (
-            <p className="px-3 pb-3 text-sm text-[var(--ink-2)]">No one else yet.</p>
-          ) : null}
-          <ul>
-            {others.map((person) => (
-              <li key={person.id}>
-                <button
-                  type="button"
-                  onClick={() => openDirect(person.id)}
-                  disabled={opening !== null}
-                  className="row flex w-full items-center gap-3 px-3 py-2.5 text-left"
-                >
-                  <Avatar name={person.displayName} presence={person.presence} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{person.displayName}</span>
-                    <span className="block truncate text-[13px] text-[var(--ink-2)]">
-                      {person.presence === "in" ? "In" : "Out"}
-                      {person.presenceUpdatedAt ? ` · ${sinceLabel(person.presenceUpdatedAt)}` : ""}
-                    </span>
-                  </span>
-                  <MessageCircle
-                    size={18}
-                    className={opening === person.id ? "animate-pulse" : "text-[var(--ink-3)]"}
-                  />
-                </button>
-              </li>
-            ))}
-          </ul>
+          <PeopleGroup
+            title="In the office"
+            tone="in"
+            people={inPeople}
+            meId={state?.me.id}
+            opening={opening}
+            onOpen={openDirect}
+            empty={state ? "Nobody's in right now." : ""}
+          />
+          <div className="mx-3 my-1 h-px bg-[var(--hairline)]" />
+          <PeopleGroup
+            title="Out"
+            tone="out"
+            people={outPeople}
+            meId={state?.me.id}
+            opening={opening}
+            onOpen={openDirect}
+            empty={state ? "Everyone's in." : ""}
+          />
         </section>
 
         <section
@@ -140,7 +142,7 @@ export function Home() {
                   <Link href={`/c/${chat.id}`} className="row flex items-center gap-3 px-3 py-2.5">
                     {chat.kind === "group" ? (
                       <span className="avatar" style={{ width: 44, height: 44 }}>
-                        <Users size={18} />
+                        {chat.announcement ? <Megaphone size={18} /> : <Users size={18} />}
                       </span>
                     ) : (
                       <Avatar name={title} presence={other?.presence} />
@@ -148,7 +150,11 @@ export function Home() {
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-medium">{title}</span>
                       <span className="block truncate text-[13px] text-[var(--ink-2)]">
-                        {chat.kind === "group" ? `${chat.memberIds.length} members` : "Private"}
+                        {chat.kind === "group"
+                          ? chat.announcement
+                            ? "Announcements"
+                            : `${chat.memberIds.length} members`
+                          : "Private"}
                         {chat.lastMessageAt ? ` · ${timeLabel(chat.lastMessageAt)}` : ""}
                       </span>
                     </span>
@@ -165,5 +171,82 @@ export function Home() {
         </section>
       </div>
     </main>
+  );
+}
+
+function PeopleGroup({
+  title,
+  tone,
+  people,
+  meId,
+  opening,
+  onOpen,
+  empty,
+}: {
+  title: string;
+  tone: "in" | "out";
+  people: Person[];
+  meId: string | undefined;
+  opening: string | null;
+  onOpen: (userId: string) => void;
+  empty: string;
+}) {
+  // You first, then by name.
+  const sorted = [...people].sort((a, b) =>
+    a.id === meId ? -1 : b.id === meId ? 1 : a.displayName.localeCompare(b.displayName),
+  );
+  return (
+    <div>
+      <h2 className="eyebrow flex items-center gap-2 px-3 pt-3 pb-2">
+        <span className={`dot dot-${tone}`} style={{ width: 6, height: 6 }} />
+        {title}
+        <span className="tabular-nums">· {people.length}</span>
+      </h2>
+      {people.length === 0 && empty ? (
+        <p className="px-3 pb-3 text-sm text-[var(--ink-2)]">{empty}</p>
+      ) : null}
+      <ul>
+        {sorted.map((person) => {
+          const isMe = person.id === meId;
+          const detail =
+            personPlanLabel(person) ??
+            (person.presenceUpdatedAt
+              ? `Since ${timeLabel(person.presenceUpdatedAt)}`
+              : "Not set yet");
+          const content = (
+            <>
+              <Avatar name={person.displayName} presence={person.presence} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">
+                  {person.displayName}
+                  {isMe ? <span className="font-normal text-[var(--ink-3)]"> · You</span> : null}
+                </span>
+                <span className="block truncate text-[13px] text-[var(--ink-2)]">{detail}</span>
+              </span>
+            </>
+          );
+          return (
+            <li key={person.id}>
+              {isMe ? (
+                <div className="flex items-center gap-3 px-3 py-2.5">{content}</div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onOpen(person.id)}
+                  disabled={opening !== null}
+                  className="row flex w-full items-center gap-3 px-3 py-2.5 text-left"
+                >
+                  {content}
+                  <MessageCircle
+                    size={18}
+                    className={opening === person.id ? "animate-pulse" : "text-[var(--ink-3)]"}
+                  />
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

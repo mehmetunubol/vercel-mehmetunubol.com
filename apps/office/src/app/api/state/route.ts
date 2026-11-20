@@ -2,6 +2,7 @@ import { asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { conversationMembers, conversations, messages, users } from "@/lib/db/schema";
 import { deleteExpiredMessages } from "@/lib/cleanup";
+import { applyDuePlans } from "@/lib/presence";
 import { getMessageTtlHours } from "@/lib/settings";
 import { getCurrentUser, unauthorized } from "@/lib/session";
 import { ADMIN_USERNAME } from "@/lib/constants";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const me = await getCurrentUser();
   if (!me) return unauthorized();
-  await deleteExpiredMessages();
+  await Promise.all([deleteExpiredMessages(), applyDuePlans()]);
 
   const [people, myConversations, ttlHours] = await Promise.all([
     db
@@ -22,6 +23,9 @@ export async function GET() {
         displayName: users.displayName,
         presence: users.presence,
         presenceUpdatedAt: users.presenceUpdatedAt,
+        plannedPresence: users.plannedPresence,
+        plannedAt: users.plannedAt,
+        plannedPrecision: users.plannedPrecision,
         hasKey: sql<boolean>`${users.publicKey} is not null`,
       })
       .from(users)
@@ -31,6 +35,7 @@ export async function GET() {
         id: conversations.id,
         kind: conversations.kind,
         name: conversations.name,
+        announcement: conversations.announcement,
         lastMessageAt: sql<string | null>`(
           select max(m.created_at) from ${messages} m
           where m.conversation_id = ${conversations.id} and m.expires_at > now()

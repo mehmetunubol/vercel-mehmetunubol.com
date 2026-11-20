@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -30,6 +31,13 @@ export const users = pgTable("users", {
   encryptedPrivateKey: text("encrypted_private_key"),
   presence: presenceEnum("presence").default("out").notNull(),
   presenceUpdatedAt: tz("presence_updated_at"),
+  // A scheduled change to the opposite status ("back in 2 h", "leaving at 17:00").
+  // Applied automatically once planned_at passes (see lib/presence.ts).
+  plannedPresence: presenceEnum("planned_presence"),
+  plannedAt: tz("planned_at"),
+  plannedPrecision: varchar("planned_precision", { length: 16 }).$type<
+    "exact" | "morning" | "afternoon" | "evening"
+  >(),
   failedLogins: integer("failed_logins").default(0).notNull(),
   lockedUntil: tz("locked_until"),
   createdAt: tz("created_at").defaultNow().notNull(),
@@ -46,6 +54,8 @@ export const conversations = pgTable("conversations", {
   name: varchar("name", { length: 64 }),
   // "<smallerUserId>:<largerUserId>" for direct chats, so each pair has one chat.
   directKey: varchar("direct_key", { length: 80 }).unique(),
+  // Group where only the admin can post; members read (and react).
+  announcement: boolean("announcement").default(false).notNull(),
   createdAt: tz("created_at").defaultNow().notNull(),
 });
 
@@ -90,4 +100,23 @@ export const messages = pgTable(
     index("messages_conversation_created_idx").on(t.conversationId, t.createdAt),
     index("messages_expires_idx").on(t.expiresAt),
   ],
+);
+
+export const reactionEnum = pgEnum("reaction", ["up", "down"]);
+
+// One reaction per person per message. Stored in the clear (who reacted 👍/👎
+// to which message id); the message text itself stays encrypted.
+export const messageReactions = pgTable(
+  "message_reactions",
+  {
+    messageId: uuid("message_id")
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    reaction: reactionEnum("reaction").notNull(),
+    createdAt: tz("created_at").defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.messageId, t.userId] })],
 );

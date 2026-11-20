@@ -2,11 +2,23 @@
 
 `office.mehmetunubol.com`: a small installable app for a fixed group of people.
 
-- **Status bar**: everyone flips themselves _In_ or _Out_ of the office. Everyone
-  sees everyone's status, and the admin's status is pinned at the top.
+- **Status bar**: everyone flips themselves _In_ or _Out_ of the office. The
+  home screen lists who's in and who's out, and the admin's status is pinned at
+  the top.
+- **Scheduled status**: set when you'll be back or leave ("in 2 h", "today at
+  15:00", "Wed 25 Nov, morning"). Morning, afternoon and evening start at 09:00,
+  13:00 and 18:00. The status flips automatically when the time arrives, and a
+  manual change cancels the plan.
 - **Messages**: end-to-end encrypted private chats (anyone ↔ anyone) and group
   chats (created and managed by the admin only). Messages are deleted after a
   configurable number of hours.
+  - **Announcement groups**: only the admin can post (enforced by the server).
+    Members read and react.
+  - **Read receipts**: "Sent / Read" in private chats, "Read by N of M" in
+    groups. Tap your own message to see who has and hasn't read it. Members who
+    joined after a message was sent aren't counted, and a device whose key is
+    locked doesn't mark anything as read.
+  - **Reactions**: 👍 / 👎 on received messages, one per person per message.
 - **Admin** (`munubol` only): add, rename and remove people, reset passwords,
   create groups and change their members, and set the message lifetime.
 - **PWA**: installable on iOS and Android ("Add to Home Screen"), runs standalone,
@@ -68,6 +80,10 @@ public keys, password-encrypted private keys, and ciphertext.
   stays readable. **Admin reset** can't do that without the old password: the
   user gets a new key pair and loses access to messages sent to them before the
   reset. Both actions sign the user out on every other device.
+
+Not encrypted: status and scheduled changes, read times, and reactions (who
+reacted 👍/👎 to which message id). These are metadata the app needs to show
+everyone; message text stays encrypted.
 
 **Limits, stated honestly:** the password reaches the server at sign-in (over
 TLS, stored as bcrypt). An operator who could modify the server code could

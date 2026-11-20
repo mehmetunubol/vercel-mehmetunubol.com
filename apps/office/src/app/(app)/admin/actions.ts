@@ -124,17 +124,25 @@ const groupSchema = z.object({
   memberIds: z.array(z.uuid()).min(1, "Pick at least one member."),
 });
 
-function readGroup(form: FormData) {
-  return groupSchema.safeParse({ name: form.get("name"), memberIds: form.getAll("memberIds") });
+/**
+ * Reads the group form. An announcement group always includes the admin,
+ * who is the only one allowed to post in it.
+ */
+async function readGroup(form: FormData) {
+  const me = await requireAdmin();
+  const announcement = form.get("announcement") === "on";
+  const memberIds = form.getAll("memberIds").map(String);
+  if (announcement && !memberIds.includes(me.id)) memberIds.push(me.id);
+  const parsed = groupSchema.safeParse({ name: form.get("name"), memberIds });
+  return parsed.success ? { ...parsed, data: { ...parsed.data, announcement } } : parsed;
 }
 
 export async function createGroup(_: ActionResult | null, form: FormData): Promise<ActionResult> {
-  await requireAdmin();
-  const parsed = readGroup(form);
+  const parsed = await readGroup(form);
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]!.message };
   const [group] = await db
     .insert(conversations)
-    .values({ kind: "group", name: parsed.data.name })
+    .values({ kind: "group", name: parsed.data.name, announcement: parsed.data.announcement })
     .returning({ id: conversations.id });
   await db
     .insert(conversationMembers)
@@ -144,16 +152,15 @@ export async function createGroup(_: ActionResult | null, form: FormData): Promi
 }
 
 export async function updateGroup(_: ActionResult | null, form: FormData): Promise<ActionResult> {
-  await requireAdmin();
   const groupId = z.uuid().safeParse(form.get("groupId"));
-  const parsed = readGroup(form);
+  const parsed = await readGroup(form);
   if (!groupId.success) return { ok: false, message: "Unknown group." };
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]!.message };
 
   const id = groupId.data;
   await db
     .update(conversations)
-    .set({ name: parsed.data.name })
+    .set({ name: parsed.data.name, announcement: parsed.data.announcement })
     .where(and(eq(conversations.id, id), eq(conversations.kind, "group")));
   const current = await db
     .select({ userId: conversationMembers.userId })

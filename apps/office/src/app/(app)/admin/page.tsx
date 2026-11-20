@@ -1,9 +1,10 @@
 import { asc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Megaphone } from "lucide-react";
 import { db } from "@/lib/db";
 import { conversationMembers, conversations, users } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/session";
+import { applyDuePlans } from "@/lib/presence";
 import { getMessageTtlHours } from "@/lib/settings";
 import { ADMIN_USERNAME, MAX_MESSAGE_TTL_HOURS, MIN_MESSAGE_TTL_HOURS } from "@/lib/constants";
 import { ActionForm } from "@/components/action-form";
@@ -62,6 +63,27 @@ function Disclosure({
   );
 }
 
+function AnnouncementToggle({ defaultChecked }: { defaultChecked?: boolean }) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[var(--hairline)] bg-[var(--field)] p-3">
+      <input
+        type="checkbox"
+        name="announcement"
+        defaultChecked={defaultChecked}
+        className="mt-0.5 size-4 accent-[var(--ink)]"
+      />
+      <span>
+        <span className="flex items-center gap-1.5 text-sm font-medium">
+          <Megaphone size={14} /> Announcements only
+        </span>
+        <span className="block text-xs text-[var(--ink-2)]">
+          Only you can post. Members can read and react.
+        </span>
+      </span>
+    </label>
+  );
+}
+
 function MemberPicker({
   people,
   selected,
@@ -96,6 +118,7 @@ function MemberPicker({
 export default async function AdminPage() {
   const me = await getCurrentUser();
   if (!me?.isAdmin) redirect("/");
+  await applyDuePlans();
 
   const [people, groups, members, ttlHours] = await Promise.all([
     db.select().from(users).orderBy(asc(users.displayName)),
@@ -237,7 +260,10 @@ export default async function AdminPage() {
                 key={group.id}
                 summary={
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{group.name}</span>
+                    <span className="flex items-center gap-1.5 truncate font-medium">
+                      {group.announcement ? <Megaphone size={14} className="shrink-0" /> : null}
+                      {group.name}
+                    </span>
                     <span className="block truncate text-[13px] text-[var(--ink-2)]">
                       {[...selected]
                         .map((id) => nameOf.get(id))
@@ -256,6 +282,7 @@ export default async function AdminPage() {
                     aria-label="Group name"
                   />
                   <MemberPicker people={people} selected={selected} />
+                  <AnnouncementToggle defaultChecked={group.announcement} />
                 </ActionForm>
                 <ActionForm
                   action={deleteGroup}
@@ -285,6 +312,7 @@ export default async function AdminPage() {
               aria-label="Group name"
             />
             <MemberPicker people={people} selected={new Set([me.id])} />
+            <AnnouncementToggle />
           </ActionForm>
         </div>
       </Section>

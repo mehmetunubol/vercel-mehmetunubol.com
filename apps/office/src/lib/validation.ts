@@ -33,4 +33,16 @@ export const sendMessageSchema = z.object({
   keys: z.record(z.uuid(), base64(200)),
 });
 
-export const presenceSchema = z.object({ presence: z.enum(["in", "out"]) });
+export const presenceSchema = z
+  .object({
+    presence: z.enum(["in", "out"]).optional(),
+    // null clears a scheduled change; omitted leaves it alone (unless presence changes).
+    plan: z
+      .object({
+        at: z.iso.datetime({ offset: true }),
+        precision: z.enum(["exact", "morning", "afternoon", "evening"]),
+      })
+      .nullable()
+      .optional(),
+  })
+  .refine((body) => body.presence !== undefined || body.plan !== undefined, "nothing to change");

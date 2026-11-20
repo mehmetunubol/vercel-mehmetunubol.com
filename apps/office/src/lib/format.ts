@@ -5,13 +5,15 @@ export function initials(name: string) {
   ).toUpperCase();
 }
 
+const pad = (n: number) => String(n).padStart(2, "0");
+
 export function timeLabel(iso: string | null, now = new Date()) {
   if (!iso) return "";
   const date = new Date(iso);
   const sameDay = date.toDateString() === now.toDateString();
   return sameDay
-    ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    : date.toLocaleDateString([], { day: "numeric", month: "short" });
+    ? `${pad(date.getHours())}:${pad(date.getMinutes())}`
+    : date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
 export function sinceLabel(iso: string | null, now = Date.now()) {
