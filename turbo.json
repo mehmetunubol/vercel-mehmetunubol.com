@@ -17,7 +17,8 @@
         "GOOGLE_CLIENT_ID",
         "GOOGLE_CLIENT_SECRET",
         "ALLOWED_EMAIL",
-        "NEXTAUTH_URL"
+        "NEXTAUTH_URL",
+        "DATABASE_DRIVER"
       ]
     },
     "dev": {

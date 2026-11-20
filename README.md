@@ -12,7 +12,9 @@ components, design tokens, and the visual shell.
 ```
 .
 ├── apps/
-│   └── web/            # Personal website / shell (Next.js App Router)
+│   ├── web/            # Personal website / shell (Next.js App Router)
+│   ├── office/         # Presence + E2E-encrypted chat PWA (office.mehmetunubol.com)
+│   └── …               # Other standalone apps
 └── packages/
     ├── config/         # Shared tsconfig, ESLint config, Tailwind v4 preset
     └── ui/             # Presentational-only shared component library

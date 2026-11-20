@@ -1,0 +1,4 @@
+scripts/*.local.json
+.vercel
+.env*
+!.env.example
