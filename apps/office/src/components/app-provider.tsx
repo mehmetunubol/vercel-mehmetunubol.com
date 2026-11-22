@@ -75,7 +75,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
   const refresh = useCallback(async () => {
     const response = await fetch("/api/state", { cache: "no-store" });
     if (response.status === 401) {
-      window.location.href = "/login";
+      window.location.href = "/";
       return;
     }
     if (response.ok) setState((await response.json()) as AppState);

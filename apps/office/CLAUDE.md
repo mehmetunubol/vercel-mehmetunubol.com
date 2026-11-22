@@ -19,3 +19,9 @@ setup and the encryption design.
   locally with `DATABASE_DRIVER=pg`) behave alike.
 - Migrations: `pnpm db:generate` creates them; the user runs `pnpm db:migrate`.
 - Before done: `pnpm typecheck && pnpm lint && pnpm test`.
+- Decoy gate: signed-out visitors get `components/gate.tsx` at every URL
+  (`proxy.ts` rewrites to `/`, whose layout renders the gate). Keep app copy,
+  metadata and the manifest free of anything that reveals what the app is.
+- Sessions end when the browser/tab/PWA closes (`lib/live-session.ts`):
+  `getCurrentUser()` requires the session-only `office_live` cookie, and
+  `SessionGuard` signs out when the tab's sessionStorage marker is missing.

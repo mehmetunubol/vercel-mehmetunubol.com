@@ -7,6 +7,7 @@ import { useApp } from "@/components/app-provider";
 import { Avatar } from "@/components/avatar";
 import { rewrapPrivateKey } from "@/lib/crypto";
 import { clearIdentities } from "@/lib/keystore";
+import { clearSessionLive } from "@/lib/live-session";
 import { MIN_PASSWORD_LENGTH } from "@/lib/constants";
 
 export function AccountView() {
@@ -70,7 +71,8 @@ export function AccountView() {
 
   async function logOut() {
     await clearIdentities();
-    await signOut({ redirectTo: "/login" });
+    clearSessionLive();
+    await signOut({ redirectTo: "/" });
   }
 
   return (

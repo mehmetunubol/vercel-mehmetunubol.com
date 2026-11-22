@@ -24,6 +24,20 @@
 - **PWA**: installable on iOS and Android ("Add to Home Screen"), runs standalone,
   and shows an offline screen.
 
+## Getting in
+
+The app hides behind a decoy: anyone who isn't signed in sees a "This office
+is closed for renovation" notice at every address (including `/login`). To
+sign in, **tap "Facilities · Notice ref. FM-2611" at the bottom three times
+quickly**. Taps more than 0.8 s apart start the count again.
+
+Sessions end when you close the browser, the tab or the installed app. You
+then land on the notice again and must sign in again. A new tab also needs its
+own sign-in. Sessions also expire after 12 hours.
+
+This hides the app from casual visitors. It is not the security boundary:
+that's still the password, the lockout and the encryption.
+
 Stack: Next.js 16 · Auth.js v5 credentials · Drizzle + Neon Postgres (free tier) ·
 Tailwind v4 · WebCrypto.
 

@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Office",
-  description: "Who's in, and a quiet place to talk.",
+  description: "Building notices.",
   robots: { index: false, follow: false },
   applicationName: "Office",
   appleWebApp: { capable: true, title: "Office", statusBarStyle: "black-translucent" },

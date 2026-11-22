@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { setupIdentity } from "@/lib/client-keys";
 import { clearIdentities } from "@/lib/keystore";
+import { markSessionLive } from "@/lib/live-session";
 
 export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +31,8 @@ export function LoginForm() {
       return;
     }
 
+    // Must come before any API call: the server requires the live-session cookie.
+    markSessionLive();
     setStep("keys");
     try {
       await clearIdentities();

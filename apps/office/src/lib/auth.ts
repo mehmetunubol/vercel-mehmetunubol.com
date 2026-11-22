@@ -16,8 +16,9 @@ declare module "next-auth" {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 30 },
-  pages: { signIn: "/login" },
+  // Short upper bound; closing the browser/app ends the session sooner (lib/live-session.ts).
+  session: { strategy: "jwt", maxAge: 60 * 60 * 12 },
+  pages: { signIn: "/" },
   callbacks: {
     jwt({ token, user }) {
       if (user) {
