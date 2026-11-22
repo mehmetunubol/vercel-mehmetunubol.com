@@ -34,4 +34,17 @@ export interface AppState {
   people: Person[];
   chats: ChatSummary[];
   ttlHours: number;
+  pendingInvites: number;
+}
+
+export type Rsvp = "pending" | "going" | "maybe" | "declined";
+
+export interface EventItem {
+  id: string;
+  title: string;
+  description: string | null;
+  startsAt: string;
+  durationMinutes: number;
+  createdBy: string;
+  invites: { userId: string; response: Rsvp }[];
 }

@@ -379,7 +379,8 @@
     color 0.15s;
 }
 
-.seg button[aria-selected="true"] {
+.seg button[aria-selected="true"],
+.seg button[aria-pressed="true"] {
   background: var(--glass-strong);
   color: var(--ink);
   box-shadow:

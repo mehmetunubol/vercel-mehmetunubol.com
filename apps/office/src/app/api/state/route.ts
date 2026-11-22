@@ -2,6 +2,7 @@ import { asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { conversationMembers, conversations, messages, users } from "@/lib/db/schema";
 import { deleteExpiredMessages } from "@/lib/cleanup";
+import { pendingInviteCount } from "@/lib/events";
 import { applyDuePlans } from "@/lib/presence";
 import { getMessageTtlHours } from "@/lib/settings";
 import { getCurrentUser, unauthorized } from "@/lib/session";
@@ -15,7 +16,7 @@ export async function GET() {
   if (!me) return unauthorized();
   await Promise.all([deleteExpiredMessages(), applyDuePlans()]);
 
-  const [people, myConversations, ttlHours] = await Promise.all([
+  const [people, myConversations, ttlHours, pendingInvites] = await Promise.all([
     db
       .select({
         id: users.id,
@@ -52,6 +53,7 @@ export async function GET() {
       .innerJoin(conversations, eq(conversations.id, conversationMembers.conversationId))
       .where(eq(conversationMembers.userId, me.id)),
     getMessageTtlHours(),
+    pendingInviteCount(me.id),
   ]);
 
   const ids = myConversations.map((c) => c.id);
@@ -94,5 +96,6 @@ export async function GET() {
     ),
     chats,
     ttlHours,
+    pendingInvites,
   });
 }

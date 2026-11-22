@@ -120,3 +120,41 @@ export const messageReactions = pgTable(
   },
   (t) => [primaryKey({ columns: [t.messageId, t.userId] })],
 );
+
+export const rsvpEnum = pgEnum("rsvp", ["pending", "going", "maybe", "declined"]);
+
+// Events are visible only to their creator and invitees. Title and description
+// are stored in the clear (unlike message text).
+export const events = pgTable(
+  "events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    title: varchar("title", { length: 80 }).notNull(),
+    description: varchar("description", { length: 500 }),
+    startsAt: tz("starts_at").notNull(),
+    durationMinutes: integer("duration_minutes").notNull(),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: tz("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("events_starts_idx").on(t.startsAt)],
+);
+
+export const eventInvites = pgTable(
+  "event_invites",
+  {
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    response: rsvpEnum("response").default("pending").notNull(),
+    respondedAt: tz("responded_at"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.eventId, t.userId] }),
+    index("event_invites_user_idx").on(t.userId),
+  ],
+);

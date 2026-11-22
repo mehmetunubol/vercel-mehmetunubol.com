@@ -2,16 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, SlidersHorizontal, UserRound } from "lucide-react";
+import { CalendarDays, House, SlidersHorizontal, UserRound } from "lucide-react";
 import { cn } from "@repo/ui";
+import { useApp } from "@/components/app-provider";
 
 export function TabBar({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
+  const { state } = useApp();
+  const pendingInvites = state?.pendingInvites ?? 0;
   // The chat screen has its own composer at the bottom.
-  if (pathname.startsWith("/c/")) return null;
+  if (pathname.startsWith("/c/") || pathname.startsWith("/events/")) return null;
 
   const tabs = [
     { href: "/", label: "Today", icon: House },
+    { href: "/events", label: "Events", icon: CalendarDays },
     ...(isAdmin ? [{ href: "/admin", label: "Admin", icon: SlidersHorizontal }] : []),
     { href: "/account", label: "Account", icon: UserRound },
   ];
@@ -33,7 +37,17 @@ export function TabBar({ isAdmin }: { isAdmin: boolean }) {
                   : "text-[var(--ink-2)] hover:text-[var(--ink)]",
               )}
             >
-              <Icon size={18} strokeWidth={2} />
+              <span className="relative">
+                <Icon size={18} strokeWidth={2} />
+                {href === "/events" && pendingInvites > 0 ? (
+                  <span
+                    aria-label={`${pendingInvites} unanswered invitations`}
+                    className="absolute -top-1.5 -right-2 grid h-4 min-w-4 place-items-center rounded-full bg-[var(--danger)] px-1 text-[10px] leading-none font-bold text-white tabular-nums"
+                  >
+                    {pendingInvites}
+                  </span>
+                ) : null}
+              </span>
               <span className={active ? "" : "sr-only sm:not-sr-only"}>{label}</span>
             </Link>
           );

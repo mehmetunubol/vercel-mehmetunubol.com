@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
-import { Megaphone, MessageCircle, Users } from "lucide-react";
-import { useApp } from "@/components/app-provider";
+import { CalendarDays, Megaphone, MessageCircle, Users } from "lucide-react";
+import { useEvents } from "@/components/use-events";
+import { dayHeading, endOf, timeRange } from "@/lib/event-time";
+import { useApp, useNow } from "@/components/app-provider";
 import { Avatar } from "@/components/avatar";
 import { PresenceCard } from "@/components/presence-card";
 import { sinceLabel, timeLabel, ttlLabel } from "@/lib/format";
@@ -84,8 +86,9 @@ export function Home() {
 
       {/* Phone: status, messages, people. Desktop: status + people left, messages right. */}
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] md:items-start">
-        <div className="md:col-start-1 md:row-start-1">
+        <div className="space-y-4 md:col-start-1 md:row-start-1">
           <PresenceCard />
+          <UpNext meId={state?.me.id} />
         </div>
 
         <section
@@ -248,5 +251,58 @@ function PeopleGroup({
         })}
       </ul>
     </div>
+  );
+}
+
+/** The next few events you're invited to (and haven't declined). */
+function UpNext({ meId }: { meId: string | undefined }) {
+  const { events } = useEvents(30_000);
+  const now = useNow();
+  const upcoming = (events ?? [])
+    .filter(
+      (e) =>
+        endOf(new Date(e.startsAt), e.durationMinutes).getTime() >= now &&
+        e.invites.find((i) => i.userId === meId)?.response !== "declined",
+    )
+    .slice(0, 3);
+  if (!upcoming.length) return null;
+  return (
+    <section className="glass rise rounded-[1.75rem] p-2" style={{ animationDelay: "40ms" }}>
+      <div className="flex items-baseline justify-between px-3 pt-3 pb-2">
+        <h2 className="eyebrow">Up next</h2>
+        <Link
+          href="/events"
+          className="text-xs font-semibold text-[var(--ink-2)] hover:text-[var(--ink)]"
+        >
+          All events
+        </Link>
+      </div>
+      <ul>
+        {upcoming.map((e) => {
+          const start = new Date(e.startsAt);
+          const pending = e.invites.find((i) => i.userId === meId)?.response === "pending";
+          return (
+            <li key={e.id}>
+              <Link href="/events" className="row flex items-center gap-3 px-3 py-2.5">
+                <span className="avatar" style={{ width: 44, height: 44 }}>
+                  <CalendarDays size={18} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{e.title}</span>
+                  <span className="block truncate text-[13px] text-[var(--ink-2)] tabular-nums">
+                    {dayHeading(start)} · {timeRange(start, e.durationMinutes)}
+                  </span>
+                </span>
+                {pending ? (
+                  <span className="rounded-full bg-[color-mix(in_oklab,var(--danger)_14%,transparent)] px-2 py-0.5 text-xs font-semibold text-[var(--danger)]">
+                    Reply
+                  </span>
+                ) : null}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

@@ -19,6 +19,14 @@
     joined after a message was sent aren't counted, and a device whose key is
     locked doesn't mark anything as read.
   - **Reactions**: 👍 / 👎 on received messages, one per person per message.
+- **Events**: anyone can plan an event with a title, a date and start time,
+  an estimated duration and an optional description (up to 500 characters),
+  and invite people. Invitees answer Going / Maybe / Can't go and see who else
+  is coming. Only the creator and invitees can see an event. The creator can
+  edit it, change invitees or cancel it. Changing the time asks everyone to
+  answer again. The Events tab has a month calendar (dots mark days with
+  events) and shows a badge for unanswered invitations. Events are removed 7
+  days after they end.
 - **Admin** (`munubol` only): add, rename and remove people, reset passwords,
   create groups and change their members, and set the message lifetime.
 - **PWA**: installable on iOS and Android ("Add to Home Screen"), runs standalone,
@@ -95,7 +103,7 @@ public keys, password-encrypted private keys, and ciphertext.
   user gets a new key pair and loses access to messages sent to them before the
   reset. Both actions sign the user out on every other device.
 
-Not encrypted: status and scheduled changes, read times, and reactions (who
+Not encrypted: status and scheduled changes, read times, reactions, and events (title, description, time, invitees and answers) (who
 reacted 👍/👎 to which message id). These are metadata the app needs to show
 everyone; message text stays encrypted.
 

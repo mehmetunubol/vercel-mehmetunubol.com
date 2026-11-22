@@ -120,3 +120,13 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
+
+/** The current time, refreshed every `intervalMs` so time-based labels stay current. */
+export function useNow(intervalMs = 30_000) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(timer);
+  }, [intervalMs]);
+  return now;
+}
