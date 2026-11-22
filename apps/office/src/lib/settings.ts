@@ -28,3 +28,24 @@ export async function setMessageTtlHours(hours: number) {
     .values({ key: "message_ttl_hours", value })
     .onConflictDoUpdate({ target: settings.key, set: { value } });
 }
+
+async function getSetting(key: string) {
+  const [row] = await db.select().from(settings).where(eq(settings.key, key)).limit(1);
+  return row?.value ?? null;
+}
+
+async function setSetting(key: string, value: string) {
+  await db
+    .insert(settings)
+    .values({ key, value })
+    .onConflictDoUpdate({ target: settings.key, set: { value } });
+}
+
+/** Panic switch: when on, nobody but the admin can sign in. */
+export async function getLoginsDisabled() {
+  return (await getSetting("logins_disabled")) === "true";
+}
+
+export async function setLoginsDisabled(disabled: boolean) {
+  await setSetting("logins_disabled", disabled ? "true" : "false");
+}

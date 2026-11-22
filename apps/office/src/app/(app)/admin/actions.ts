@@ -1,14 +1,15 @@
 "use server";
 
 import { hash } from "bcryptjs";
-import { and, eq, inArray, like, or, sql } from "drizzle-orm";
+import { and, eq, inArray, like, ne, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { conversationMembers, conversations, users } from "@/lib/db/schema";
+import { conversationMembers, conversations, messages, users } from "@/lib/db/schema";
 import { ADMIN_USERNAME, MIN_PASSWORD_LENGTH, USERNAME_PATTERN } from "@/lib/constants";
 import { getCurrentUser } from "@/lib/session";
-import { setMessageTtlHours } from "@/lib/settings";
+import { markAllAlertsSeen } from "@/lib/security";
+import { setLoginsDisabled, setMessageTtlHours } from "@/lib/settings";
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; message: string };
 
@@ -202,4 +203,47 @@ export async function saveSettings(_: ActionResult | null, form: FormData): Prom
     return { ok: false, message: "Enter a number of hours." };
   await setMessageTtlHours(hours);
   return done("Saved. Applies to new messages.");
+}
+
+/** Lets a locked-out user straight back in. */
+export async function unlockUser(_: ActionResult | null, form: FormData): Promise<ActionResult> {
+  await requireAdmin();
+  const userId = z.uuid().safeParse(form.get("userId"));
+  if (!userId.success) return { ok: false, message: "Unknown user." };
+  await db
+    .update(users)
+    .set({ failedLogins: 0, lockedUntil: null })
+    .where(eq(users.id, userId.data));
+  return done("Unlocked.");
+}
+
+export async function markAlertsSeen(): Promise<ActionResult> {
+  await requireAdmin();
+  await markAllAlertsSeen();
+  return done();
+}
+
+/** Panic button: deletes every message in every conversation. */
+export async function purgeAllMessages(): Promise<ActionResult> {
+  await requireAdmin();
+  const deleted = await db.delete(messages).returning({ id: messages.id });
+  return done(`Deleted ${deleted.length} ${deleted.length === 1 ? "message" : "messages"}.`);
+}
+
+/**
+ * Panic button: blocks sign-in for everyone but the admin and signs them all
+ * out now. They see the ordinary "account locked" message.
+ */
+export async function setSignInsDisabled(disabled: boolean): Promise<ActionResult> {
+  const me = await requireAdmin();
+  await setLoginsDisabled(disabled);
+  if (disabled) {
+    await db
+      .update(users)
+      .set({ tokenVersion: sql`${users.tokenVersion} + 1` })
+      .where(ne(users.id, me.id));
+  }
+  return done(
+    disabled ? "Sign-ins disabled. Everyone else has been signed out." : "Sign-ins enabled again.",
+  );
 }

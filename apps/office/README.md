@@ -27,8 +27,23 @@
   answer again. The Events tab has a month calendar (dots mark days with
   events) and shows a badge for unanswered invitations. Events are removed 7
   days after they end.
-- **Admin** (`munubol` only): add, rename and remove people, reset passwords,
+- **Admin** (`user` only): add, rename and remove people, reset passwords,
   create groups and change their members, and set the message lifetime.
+- **Security alerts**: when any account is locked after 5 wrong passwords, the
+  admin gets a banner, an Admin-tab badge, a nudge (below) and an entry under
+  Admin → Security, with "Unlock now".
+- **Panic buttons** (Admin → Emergency): _Delete all messages now_, and
+  _Disable sign-ins_, which signs everyone but the admin out and blocks
+  sign-in. Blocked users see the ordinary "account locked, try again in 15
+  minutes" message.
+- **Notifications**: optional per device (Account → Notifications). They are
+  deliberately content-free: the server sends an empty push, and the phone
+  shows a random everyday line ("Reminder: Your weekly summary is ready").
+  Nothing about the app, the sender or the content is sent. Triggers: a new
+  message, a new or rescheduled event invitation, and (admin) a lockout. At
+  most one per device per minute. On iPhone they need the app on the Home
+  Screen (iOS 16.4+). The phone still shows the installed app's name, and on
+  Android browsers the web address, in the notification header.
 - **PWA**: installable on iOS and Android ("Add to Home Screen"), runs standalone,
   and shows an offline screen.
 
@@ -54,7 +69,8 @@ Tailwind v4 · WebCrypto.
 1. **Database.** Create a new free Neon project (keep it separate from the job
    helper's database) and copy its connection string.
 2. **Env.** `cp .env.example .env.local` and fill in `DATABASE_URL`, `AUTH_SECRET`
-   (`openssl rand -base64 32`) and `CRON_SECRET`.
+   (`openssl rand -base64 32`) and `CRON_SECRET`. For notifications, also
+   `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` from `npx web-push generate-vapid-keys`.
 3. **Migrate and create the admin.**
 
    ```bash
@@ -62,7 +78,7 @@ Tailwind v4 · WebCrypto.
    ```
 
    ```bash
-   OFFICE_USERNAME=munubol OFFICE_DISPLAY_NAME="Mehmet Ünübol" OFFICE_PASSWORD='choose-one' pnpm --filter office user:upsert
+   OFFICE_USERNAME=user OFFICE_DISPLAY_NAME="Mehmet Ünübol" OFFICE_PASSWORD='choose-one' pnpm --filter office user:upsert
    ```
 
    Run the same command again to recover a forgotten password. Everyone else is
@@ -75,7 +91,9 @@ To use a plain local Postgres instead of Neon, set `DATABASE_DRIVER=pg`.
 ## Deploy (Vercel, subdomain)
 
 1. New Vercel project from this repo, **Root Directory** `apps/office`.
-2. Env vars (Production + Preview): `DATABASE_URL`, `AUTH_SECRET`, `CRON_SECRET`.
+2. Env vars (Production + Preview): `DATABASE_URL`, `AUTH_SECRET`, `CRON_SECRET`,
+   and for notifications `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (optionally
+   `VAPID_SUBJECT`, a `mailto:` contact only the push service sees).
 3. Settings → Domains → add `office.mehmetunubol.com` (a `CNAME` to
    `cname.vercel-dns.com` if DNS isn't on Vercel).
 4. `vercel.json` registers a daily cleanup cron. Expired messages are also

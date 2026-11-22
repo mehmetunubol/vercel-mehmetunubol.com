@@ -18,7 +18,10 @@
         "GOOGLE_CLIENT_SECRET",
         "ALLOWED_EMAIL",
         "NEXTAUTH_URL",
-        "DATABASE_DRIVER"
+        "DATABASE_DRIVER",
+        "VAPID_PUBLIC_KEY",
+        "VAPID_PRIVATE_KEY",
+        "VAPID_SUBJECT"
       ]
     },
     "dev": {

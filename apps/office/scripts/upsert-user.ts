@@ -5,7 +5,7 @@ import { users } from "../src/lib/db/schema";
 
 // Bootstrap / recovery: creates a user, or resets an existing user's password
 // (which also clears their E2E keys and signs them out everywhere).
-//   OFFICE_USERNAME=munubol OFFICE_DISPLAY_NAME="Mehmet" OFFICE_PASSWORD='...' pnpm user:upsert
+//   OFFICE_USERNAME=user OFFICE_DISPLAY_NAME="Mehmet" OFFICE_PASSWORD='...' pnpm user:upsert
 async function main() {
   const username = process.env.OFFICE_USERNAME?.trim().toLowerCase();
   const password = process.env.OFFICE_PASSWORD;

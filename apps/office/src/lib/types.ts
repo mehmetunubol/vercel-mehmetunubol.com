@@ -35,6 +35,7 @@ export interface AppState {
   chats: ChatSummary[];
   ttlHours: number;
   pendingInvites: number;
+  admin: { securityAlerts: number; loginsDisabled: boolean } | null;
 }
 
 export type Rsvp = "pending" | "going" | "maybe" | "declined";

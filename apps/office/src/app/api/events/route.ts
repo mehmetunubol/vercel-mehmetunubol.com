@@ -7,6 +7,7 @@ import {
   startProblem,
   validInvitees,
 } from "@/lib/events";
+import { notifyUsers } from "@/lib/push";
 import { badRequest, getCurrentUser, unauthorized } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -44,5 +45,6 @@ export async function POST(request: Request) {
     { eventId: event!.id, userId: me.id, response: "going", respondedAt: new Date() },
     ...inviteeIds.map((userId) => ({ eventId: event!.id, userId })),
   ]);
+  notifyUsers(inviteeIds);
   return Response.json({ id: event!.id });
 }

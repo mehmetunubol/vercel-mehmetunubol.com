@@ -5,6 +5,7 @@ import { signIn, signOut } from "next-auth/react";
 import { LockKeyhole, LogOut } from "lucide-react";
 import { useApp } from "@/components/app-provider";
 import { Avatar } from "@/components/avatar";
+import { NotificationsCard } from "@/components/notifications-card";
 import { rewrapPrivateKey } from "@/lib/crypto";
 import { clearIdentities } from "@/lib/keystore";
 import { clearSessionLive } from "@/lib/live-session";
@@ -132,6 +133,8 @@ export function AccountView() {
           {busy ? "Changing…" : "Change password"}
         </button>
       </form>
+
+      <NotificationsCard />
 
       <section
         className="glass rise space-y-3 rounded-[1.75rem] p-5"

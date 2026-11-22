@@ -10,6 +10,7 @@ export function TabBar({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
   const { state } = useApp();
   const pendingInvites = state?.pendingInvites ?? 0;
+  const securityAlerts = state?.admin?.securityAlerts ?? 0;
   // The chat screen has its own composer at the bottom.
   if (pathname.startsWith("/c/") || pathname.startsWith("/events/")) return null;
 
@@ -39,6 +40,14 @@ export function TabBar({ isAdmin }: { isAdmin: boolean }) {
             >
               <span className="relative">
                 <Icon size={18} strokeWidth={2} />
+                {href === "/admin" && securityAlerts > 0 ? (
+                  <span
+                    aria-label={`${securityAlerts} security alerts`}
+                    className="absolute -top-1.5 -right-2 grid h-4 min-w-4 place-items-center rounded-full bg-[var(--danger)] px-1 text-[10px] leading-none font-bold text-white tabular-nums"
+                  >
+                    {securityAlerts}
+                  </span>
+                ) : null}
                 {href === "/events" && pendingInvites > 0 ? (
                   <span
                     aria-label={`${pendingInvites} unanswered invitations`}

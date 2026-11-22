@@ -29,6 +29,27 @@
       "when": 1795372297470,
       "tag": "0003_events",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795373854599,
+      "tag": "0004_security_alerts",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795374080555,
+      "tag": "0005_rename_admin",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795374670893,
+      "tag": "0006_push_subscriptions",
+      "breakpoints": true
     }
   ]
 }

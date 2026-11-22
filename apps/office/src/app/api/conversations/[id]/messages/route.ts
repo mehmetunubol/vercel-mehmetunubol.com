@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { conversationMembers, messageReactions, messages } from "@/lib/db/schema";
 import { deleteExpiredMessages } from "@/lib/cleanup";
 import { getConversation, isMember, isUuid } from "@/lib/conversations";
+import { notifyUsers } from "@/lib/push";
 import { getMessageTtlHours } from "@/lib/settings";
 import { badRequest, forbidden, getCurrentUser, unauthorized } from "@/lib/session";
 import { sendMessageSchema } from "@/lib/validation";
@@ -53,7 +54,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   // Read state and reactions are small and change on older messages too, so
   // every poll returns them in full for the conversation.
-  const [reads, reactions] = await Promise.all([
+  const [reads, reactions, liveIds] = await Promise.all([
     db
       .select({
         userId: conversationMembers.userId,
@@ -71,9 +72,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       .from(messageReactions)
       .innerJoin(messages, eq(messages.id, messageReactions.messageId))
       .where(and(eq(messages.conversationId, id), live)),
+    // Every live message id, so clients drop ones that were deleted (panic purge).
+    db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(and(eq(messages.conversationId, id), live))
+      .then((r) => r.map((m) => m.id)),
   ]);
 
-  return Response.json({ messages: rows, reads, reactions });
+  return Response.json({ messages: rows, reads, reactions, liveIds });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -113,5 +120,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .onConflictDoNothing()
     .returning({ id: messages.id, createdAt: messages.createdAt, expiresAt: messages.expiresAt });
   if (!row) return Response.json({ error: "duplicate id" }, { status: 409 });
+  notifyUsers(conversation.members.map((m) => m.id).filter((uid) => uid !== me.id));
   return Response.json(row);
 }

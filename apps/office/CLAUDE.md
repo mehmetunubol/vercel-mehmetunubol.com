@@ -6,7 +6,7 @@ setup and the encryption design.
 
 ## Standing rules
 
-- Admin is the hardcoded username `munubol` (`src/lib/constants.ts`); there is no
+- Admin is the hardcoded username `user` (`src/lib/constants.ts`); there is no
   roles table.
 - The server must never see plaintext messages. All encrypt/decrypt happens in
   `src/lib/crypto.ts` on the client; API routes only validate and store
@@ -25,3 +25,17 @@ setup and the encryption design.
 - Sessions end when the browser/tab/PWA closes (`lib/live-session.ts`):
   `getCurrentUser()` requires the session-only `office_live` cookie, and
   `SessionGuard` signs out when the tab's sessionStorage marker is missing.
+- Push notifications must stay content-free: `lib/push.ts` sends an empty
+  payload and `public/sw.js` picks a random generic line. Never put the app
+  name, sender, title or message text into a push or a notification.
+- Panic switch "disable sign-ins" exempts only `ADMIN_USERNAME`, and blocked
+  users must see the same "locked" message as a real lockout.
+
+## Backlog (requested, not built)
+
+- **One-time-view photos** in chats: shown once, then deleted. The user asked to
+  keep this for later. Open design points: encrypt the image client-side like
+  messages; store blobs outside Postgres (Neon free tier is small), e.g.
+  Vercel Blob; delete the blob after the recipient has viewed it (and on
+  expiry); in groups, decide whether "seen" means seen by one person or by
+  everyone. Screenshots can't be prevented on the web, so say so in the UI.

@@ -173,10 +173,26 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       messages: WireMessage[];
       reads: ReadState[];
       reactions: WireReaction[];
+      liveIds: string[];
     };
     const { messages } = data;
     setReads(data.reads);
     if (version === reactionsVersion.current) setReactions(data.reactions);
+    // Drop messages the server no longer has (deleted by the admin).
+    const liveIds = new Set(data.liveIds);
+    for (const id of [...wire.current.keys()]) if (!liveIds.has(id)) wire.current.delete(id);
+    setItems((prev) => {
+      // Skip very recent ones: a poll that started just before a send won't list it yet.
+      const cutoff = Date.now() - 10_000;
+      const gone = [...prev.values()].filter(
+        (m) =>
+          !liveIds.has(m.id) && !m.sending && !m.error && new Date(m.createdAt).getTime() < cutoff,
+      );
+      if (!gone.length) return prev;
+      const next = new Map(prev);
+      for (const m of gone) next.delete(m.id);
+      return next;
+    });
     const fresh = messages.filter((m) => !wire.current.has(m.id));
     for (const m of messages) wire.current.set(m.id, m);
     if (messages.length) cursor.current = messages[messages.length - 1]!.createdAt;

@@ -26,7 +26,9 @@ export function LoginForm() {
     if (!result || result.error) {
       setStep("idle");
       setError(
-        "That username and password don't match. After 5 failed attempts the account pauses for 15 minutes.",
+        result?.code === "locked"
+          ? "Too many attempts. This account is locked. Try again in 15 minutes."
+          : "That username and password don't match. After 5 failed attempts the account pauses for 15 minutes.",
       );
       return;
     }

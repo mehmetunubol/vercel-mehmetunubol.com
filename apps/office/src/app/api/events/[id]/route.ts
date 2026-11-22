@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { eventInvites, events } from "@/lib/db/schema";
 import { isUuid } from "@/lib/conversations";
 import { eventInputSchema, getEventForUser, startProblem, validInvitees } from "@/lib/events";
+import { notifyUsers } from "@/lib/push";
 import { badRequest, forbidden, getCurrentUser, unauthorized } from "@/lib/session";
 
 const notFound = () => Response.json({ error: "not found" }, { status: 404 });
@@ -59,6 +60,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .set({ response: "pending", respondedAt: null })
       .where(and(eq(eventInvites.eventId, id), ne(eventInvites.userId, me.id)));
   }
+  // New invitees, and everyone if the time moved (they need to answer again).
+  notifyUsers(timeChanged ? [...wanted] : added);
   return Response.json({ ok: true });
 }
 

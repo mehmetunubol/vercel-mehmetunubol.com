@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
-import { CalendarDays, Megaphone, MessageCircle, Users } from "lucide-react";
+import { CalendarDays, Megaphone, MessageCircle, ShieldAlert, Users } from "lucide-react";
 import { useEvents } from "@/components/use-events";
 import { dayHeading, endOf, timeRange } from "@/lib/event-time";
 import { useApp, useNow } from "@/components/app-provider";
@@ -66,6 +66,30 @@ export function Home() {
           {state ? `${inCount} of ${state.people.length} in` : ""}
         </p>
       </header>
+
+      {state?.admin && (state.admin.securityAlerts > 0 || state.admin.loginsDisabled) ? (
+        <Link
+          href="/admin"
+          className="rise mb-4 flex items-center gap-3 rounded-[1.6rem] border border-[color-mix(in_oklab,var(--danger)_35%,transparent)] bg-[color-mix(in_oklab,var(--danger)_10%,transparent)] px-4 py-3 text-sm"
+        >
+          <ShieldAlert size={18} className="shrink-0 text-[var(--danger)]" />
+          <span className="min-w-0 flex-1">
+            {state.admin.securityAlerts > 0 ? (
+              <span className="block font-semibold">
+                {state.admin.securityAlerts === 1
+                  ? "An account was locked after failed sign-in attempts"
+                  : `${state.admin.securityAlerts} accounts were locked after failed sign-in attempts`}
+              </span>
+            ) : null}
+            {state.admin.loginsDisabled ? (
+              <span className="block text-[var(--ink-2)]">
+                Sign-ins are disabled for everyone but you.
+              </span>
+            ) : null}
+          </span>
+          <span className="shrink-0 font-semibold">Review</span>
+        </Link>
+      ) : null}
 
       {showAdminBanner ? (
         <div className="glass rise mb-4 flex items-center gap-3 rounded-[1.6rem] py-2 pr-4 pl-2">

@@ -1,11 +1,13 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { ChevronDown, Megaphone } from "lucide-react";
+import { ChevronDown, Megaphone, ShieldAlert } from "lucide-react";
 import { db } from "@/lib/db";
-import { conversationMembers, conversations, users } from "@/lib/db/schema";
+import { conversationMembers, conversations, securityAlerts, users } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/session";
 import { applyDuePlans } from "@/lib/presence";
-import { getMessageTtlHours } from "@/lib/settings";
+import { getLoginsDisabled, getMessageTtlHours } from "@/lib/settings";
+import { EmergencyPanel } from "@/components/emergency-panel";
+import { LocalTime } from "@/components/local-time";
 import { ADMIN_USERNAME, MAX_MESSAGE_TTL_HOURS, MIN_MESSAGE_TTL_HOURS } from "@/lib/constants";
 import { ActionForm } from "@/components/action-form";
 import { Avatar } from "@/components/avatar";
@@ -14,6 +16,8 @@ import {
   createUser,
   deleteGroup,
   deleteUser,
+  markAlertsSeen,
+  unlockUser,
   renameUser,
   resetPassword,
   saveSettings,
@@ -120,7 +124,7 @@ export default async function AdminPage() {
   if (!me?.isAdmin) redirect("/");
   await applyDuePlans();
 
-  const [people, groups, members, ttlHours] = await Promise.all([
+  const [people, groups, members, ttlHours, alerts, loginsDisabled] = await Promise.all([
     db.select().from(users).orderBy(asc(users.displayName)),
     db
       .select()
@@ -136,7 +140,21 @@ export default async function AdminPage() {
       .innerJoin(conversations, eq(conversations.id, conversationMembers.conversationId))
       .where(eq(conversations.kind, "group")),
     getMessageTtlHours(),
+    db
+      .select({
+        id: securityAlerts.id,
+        kind: securityAlerts.kind,
+        userId: securityAlerts.userId,
+        createdAt: securityAlerts.createdAt,
+        seenAt: securityAlerts.seenAt,
+      })
+      .from(securityAlerts)
+      .orderBy(desc(securityAlerts.createdAt))
+      .limit(20),
+    getLoginsDisabled(),
   ]);
+  const unseen = alerts.filter((a) => !a.seenAt).length;
+  const now = new Date();
   const membersOf = (groupId: string) =>
     new Set(members.filter((m) => m.conversationId === groupId).map((m) => m.userId));
   const nameOf = new Map(people.map((p) => [p.id, p.displayName]));
@@ -147,6 +165,72 @@ export default async function AdminPage() {
         <p className="eyebrow">Administration</p>
         <h1 className="mt-1 text-3xl font-semibold">People &amp; groups</h1>
       </header>
+
+      <Section
+        title="Security"
+        hint="An alert appears when an account is locked after 5 wrong passwords in a row."
+      >
+        <div className="px-1 pb-2">
+          {alerts.length === 0 ? (
+            <p className="px-2 pb-2 text-sm text-[var(--ink-2)]">No alerts in the last 30 days.</p>
+          ) : null}
+          <ul className="space-y-1">
+            {alerts.map((alert) => {
+              const person = people.find((p) => p.id === alert.userId);
+              const stillLocked = person?.lockedUntil && person.lockedUntil > now;
+              return (
+                <li
+                  key={alert.id}
+                  className={`flex items-start gap-3 rounded-2xl px-2 py-2.5 ${alert.seenAt ? "" : "bg-[color-mix(in_oklab,var(--danger)_9%,transparent)]"}`}
+                >
+                  <ShieldAlert
+                    size={18}
+                    className={`mt-0.5 shrink-0 ${alert.seenAt ? "text-[var(--ink-3)]" : "text-[var(--danger)]"}`}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm">
+                      <span className="font-semibold">{person?.displayName ?? "Removed user"}</span>
+                      {person ? (
+                        <span className="text-[var(--ink-2)]"> (@{person.username})</span>
+                      ) : null}
+                      : locked after 5 failed sign-in attempts
+                    </p>
+                    <p className="text-xs text-[var(--ink-3)] tabular-nums">
+                      <LocalTime iso={alert.createdAt.toISOString()} />
+                      {stillLocked ? " · still locked" : ""}
+                    </p>
+                  </div>
+                  {stillLocked && person ? (
+                    <ActionForm
+                      action={unlockUser}
+                      submitLabel="Unlock now"
+                      submitClassName="btn-quiet btn-sm"
+                    >
+                      <input type="hidden" name="userId" value={person.id} />
+                    </ActionForm>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+          {unseen > 0 ? (
+            <div className="px-2 pt-2">
+              <ActionForm
+                action={markAlertsSeen}
+                submitLabel={`Mark ${unseen} as seen`}
+                submitClassName="btn-quiet btn-sm"
+              />
+            </div>
+          ) : null}
+        </div>
+      </Section>
+
+      <Section
+        title="Emergency"
+        hint="Use these only if something has gone wrong. Each asks for confirmation."
+      >
+        <EmergencyPanel loginsDisabled={loginsDisabled} />
+      </Section>
 
       <Section title="People" hint="Only people listed here can sign in.">
         <div>

@@ -158,3 +158,34 @@ export const eventInvites = pgTable(
     index("event_invites_user_idx").on(t.userId),
   ],
 );
+
+// Shown to the admin. kind "lockout": an account was locked after too many
+// failed sign-ins (userId is the account that was targeted).
+export const securityAlerts = pgTable(
+  "security_alerts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    kind: varchar("kind", { length: 32 }).notNull(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    createdAt: tz("created_at").defaultNow().notNull(),
+    seenAt: tz("seen_at"),
+  },
+  (t) => [index("security_alerts_created_idx").on(t.createdAt)],
+);
+
+// Web Push endpoints, one per device that turned notifications on.
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull().unique(),
+    p256dh: varchar("p256dh", { length: 200 }).notNull(),
+    auth: varchar("auth", { length: 64 }).notNull(),
+    createdAt: tz("created_at").defaultNow().notNull(),
+    lastSentAt: tz("last_sent_at"),
+  },
+  (t) => [index("push_subscriptions_user_idx").on(t.userId)],
+);

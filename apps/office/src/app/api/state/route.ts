@@ -4,7 +4,8 @@ import { conversationMembers, conversations, messages, users } from "@/lib/db/sc
 import { deleteExpiredMessages } from "@/lib/cleanup";
 import { pendingInviteCount } from "@/lib/events";
 import { applyDuePlans } from "@/lib/presence";
-import { getMessageTtlHours } from "@/lib/settings";
+import { deleteOldAlerts, unseenAlertCount } from "@/lib/security";
+import { getLoginsDisabled, getMessageTtlHours } from "@/lib/settings";
 import { getCurrentUser, unauthorized } from "@/lib/session";
 import { ADMIN_USERNAME } from "@/lib/constants";
 
@@ -97,5 +98,11 @@ export async function GET() {
     chats,
     ttlHours,
     pendingInvites,
+    // Admin only: unseen security alerts and whether the sign-in panic switch is on.
+    admin: me.isAdmin
+      ? await Promise.all([unseenAlertCount(), getLoginsDisabled(), deleteOldAlerts()]).then(
+          ([securityAlerts, loginsDisabled]) => ({ securityAlerts, loginsDisabled }),
+        )
+      : null,
   });
 }

@@ -1,5 +1,5 @@
 // Only this account can manage users, groups and settings.
-export const ADMIN_USERNAME = "munubol";
+export const ADMIN_USERNAME = "user";
 
 export const MAX_MESSAGE_CHARS = 4000;
 export const DEFAULT_MESSAGE_TTL_HOURS = 24;
