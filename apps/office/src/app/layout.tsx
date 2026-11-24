@@ -3,11 +3,11 @@ import { ServiceWorker } from "@/components/service-worker";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Office",
-  description: "Building notices.",
+  title: "Day Planner",
+  description: "A simple list for your day.",
   robots: { index: false, follow: false },
-  applicationName: "Office",
-  appleWebApp: { capable: true, title: "Office", statusBarStyle: "black-translucent" },
+  applicationName: "Day Planner",
+  appleWebApp: { capable: true, title: "Day Planner", statusBarStyle: "black-translucent" },
   icons: {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
   },

@@ -1,6 +1,7 @@
 # Office
 
-`office.mehmetunubol.com`: a small installable app for a fixed group of people.
+`office.mehmetunubol.com`: a small installable app for a fixed group of people,
+disguised as **Day Planner** (see "Getting in").
 
 - **Status bar**: everyone flips themselves _In_ or _Out_ of the office. The
   home screen lists who's in and who's out, and the admin's status is pinned at
@@ -76,13 +77,15 @@
 
 ## Getting in
 
-The app hides behind a decoy: anyone who isn't signed in sees a "This office
-is closed for renovation" notice at every address (including `/login`). To
-sign in, **tap "Facilities · Notice ref. FM-2611" at the bottom three times
-quickly**. Taps more than 0.8 s apart start the count again.
+To anyone who isn't signed in, the app is **"Day Planner"**: that's its
+installed name, its checklist icon, the browser tab title and the name shown on
+notifications. Every address (including `/login`) shows a small, working
+to-do list. Its items are kept only in that browser and never sent to the
+server. To sign in, **tap the date at the top three times quickly**. Taps more
+than 0.8 s apart start the count again.
 
 Sessions end when you close the browser, the tab or the installed app. You
-then land on the notice again and must sign in again. A new tab also needs its
+then land on the planner again and must sign in again. A new tab also needs its
 own sign-in. Sessions also expire after 12 hours.
 
 This hides the app from casual visitors. It is not the security boundary:

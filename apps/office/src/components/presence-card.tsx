@@ -99,7 +99,7 @@ export function PresenceCard() {
         className="presence-switch mt-5"
         data-value={presence}
         role="group"
-        aria-label="Office status"
+        aria-label="Your status"
       >
         <span className="thumb" aria-hidden="true" />
         <button type="button" aria-pressed={presence === "in"} onClick={() => setNow("in")}>

@@ -1,5 +1,5 @@
-import { type Browser, devices, test } from "@playwright/test";
-import { BASE, closeAllWindows, deleteLocalKeys, ok, signIn } from "./helpers";
+import { type Browser, devices, expect, test } from "@playwright/test";
+import { BASE, DECOY, closeAllWindows, deleteLocalKeys, ok, signIn, tapSecret } from "./helpers";
 
 // Sign-in gate, people, private and group chats, sessions, keys and passwords.
 // Later suites build on the users and chats created here.
@@ -22,17 +22,40 @@ test("core: gate, people, chats, sessions and passwords", async ({ browser }) =>
     const ctx = await browser.newContext();
     const p = await ctx.newPage();
     await p.goto(BASE + "/login");
-    await p.waitForSelector("text=This office is closed for renovation");
+    await p.waitForSelector(DECOY);
     ok(!(await p.isVisible("input[name=username]")), "/login shows only the decoy");
-    await p.click("text=Notice ref. FM-2611");
-    await p.click("text=Notice ref. FM-2611");
+
+    // The decoy is a working day planner, kept only in this browser.
+    const apiCalls: string[] = [];
+    p.on("request", (r) => {
+      if (new URL(r.url()).pathname.startsWith("/api/")) apiCalls.push(r.url());
+    });
+    await p.fill('input[aria-label="Add a task"]', "Pick up dry cleaning");
+    await p.click('button[aria-label="Add"]');
+    await p.click('[role=checkbox][aria-label="Pick up dry cleaning"]');
+    await p.reload();
+    await expect(p.locator('[role=checkbox][aria-label="Pick up dry cleaning"]')).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    ok(true, "the decoy list works and survives a reload");
+    ok(apiCalls.length === 0, "using the decoy list sends nothing to the server");
+    const manifest = await (await p.request.get(BASE + "/manifest.webmanifest")).json();
+    ok(
+      manifest.name === "Day Planner" && manifest.short_name === "Day Planner",
+      'the installed app is called "Day Planner"',
+    );
+    ok((await p.title()) === "Day Planner", 'the browser tab says "Day Planner"');
+    await expect(p.locator("h1")).not.toHaveText(/^\s*$/);
+    await p.locator("h1").click();
+    await p.locator("h1").click();
     await p.waitForTimeout(300);
     ok(!(await p.isVisible("input[name=username]")), "two taps do not open sign-in");
     await p.waitForTimeout(1000);
-    await p.click("text=Notice ref. FM-2611");
+    await p.locator("h1").click();
     ok(!(await p.isVisible("input[name=username]")), "slow taps do not open sign-in");
     await p.waitForTimeout(1000);
-    for (let i = 0; i < 3; i++) await p.click("text=Notice ref. FM-2611");
+    await tapSecret(p);
     await p.waitForSelector("input[name=username]");
     ok(true, "three quick taps open sign-in");
     await p.fill("input[name=username]", "user");
@@ -149,7 +172,7 @@ test("core: gate, people, chats, sessions and passwords", async ({ browser }) =>
   await reopenedCtx.addCookies(await ayse.ctx.cookies());
   const reopened = await reopenedCtx.newPage();
   await reopened.goto(directUrl);
-  await reopened.waitForSelector("text=This office is closed for renovation");
+  await reopened.waitForSelector(DECOY);
   await reopened.waitForFunction(() => location.pathname === "/");
   await reopened.waitForTimeout(500);
   const rs = await reopened.evaluate(async () => (await fetch("/api/state")).status);
@@ -163,7 +186,7 @@ test("core: gate, people, chats, sessions and passwords", async ({ browser }) =>
   const rr = await restarted.request.get(BASE + "/api/state");
   ok(rr.status() === 401, "without the session cookie the API refuses");
   await restarted.goto(BASE + "/admin");
-  await restarted.waitForSelector("text=This office is closed for renovation");
+  await restarted.waitForSelector(DECOY);
   ok(!(await restarted.content()).includes("People &amp; groups"), "no app content in decoy HTML");
   await restartCtx.close();
   const still = await ayse.page.evaluate(async () => (await fetch("/api/state")).status);

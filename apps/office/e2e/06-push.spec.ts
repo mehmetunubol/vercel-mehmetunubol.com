@@ -12,6 +12,7 @@ import {
   signIn,
   sleep,
   sql,
+  tapSecret,
   userIds,
   waitFor,
 } from "./helpers";
@@ -102,7 +103,7 @@ test("push: content-free nudges", async ({ browser }) => {
   await clearPushLog();
   const gate = await (await browser.newContext()).newPage();
   await gate.goto(BASE + "/");
-  for (let i = 0; i < 3; i++) await gate.click("text=Notice ref. FM-2611");
+  await tapSecret(gate);
   for (let i = 1; i <= 5; i++) {
     await gate.fill("input[name=username]", "burak");
     await gate.fill("input[name=password]", "nope-" + i);

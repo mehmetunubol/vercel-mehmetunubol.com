@@ -23,6 +23,9 @@ setup and the encryption design.
   `e2e/README.md`). Add or update a suite step for new behaviour. Assertions
   must not depend on the time of day (the planner switches modes after 22:00,
   and "in 2 h" becomes "tomorrow at …" near midnight).
+- Cover story: the app presents itself as **"Day Planner"** (manifest, title,
+  icon, notification lines in `public/sw.js`). Keep every user-visible name,
+  icon and notification consistent with it; never show "Office" before sign-in.
 - Decoy gate: signed-out visitors get `components/gate.tsx` at every URL
   (`proxy.ts` rewrites to `/`, whose layout renders the gate). Keep app copy,
   metadata and the manifest free of anything that reveals what the app is.

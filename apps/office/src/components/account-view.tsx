@@ -161,7 +161,7 @@ export function AccountView() {
 /** "Show when I'm online": reciprocal, so hiding yours hides everyone else's from you. */
 function OnlineStatusToggle() {
   const { state, refresh } = useApp();
-const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState(false);
   // Flip the switch immediately; the server's answer replaces it after refresh.
   const [optimistic, setOptimistic] = useState<boolean | null>(null);
   if (!state) return null;
@@ -175,7 +175,7 @@ const [saving, setSaving] = useState(false);
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ hideOnline: showing }),
     }).catch(() => {});
-await refresh();
+    await refresh();
     setOptimistic(null);
     setSaving(false);
   }

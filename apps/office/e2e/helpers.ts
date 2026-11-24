@@ -25,6 +25,16 @@ export async function waitFor(check: () => Promise<boolean> | boolean, ms = 10_0
   return false;
 }
 
+/** The decoy front page is showing (a day planner with "Today's list"). */
+export const DECOY = "text=/Today.s list/";
+
+/** Three quick taps on the date at the top of the decoy page reveal sign-in. */
+export async function tapSecret(page: Page) {
+  const date = page.locator("h1");
+  await expect(date).not.toHaveText(/^\s*$/);
+  for (let i = 0; i < 3; i++) await date.click();
+}
+
 /** A fresh "phone" with the decoy page open and sign-in revealed. */
 export async function openGate(browser: Browser, scheme: "light" | "dark" = "dark") {
   const context = await browser.newContext({
@@ -36,7 +46,7 @@ export async function openGate(browser: Browser, scheme: "light" | "dark" = "dar
   const page = await context.newPage();
   page.on("dialog", (d) => void d.accept());
   await page.goto("/");
-  for (let i = 0; i < 3; i++) await page.click("text=Notice ref. FM-2611");
+  await tapSecret(page);
   await page.waitForSelector("input[name=username]");
   return page;
 }

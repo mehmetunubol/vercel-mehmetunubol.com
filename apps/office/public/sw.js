@@ -1,6 +1,6 @@
-// Office service worker: makes the app installable and keeps static assets
+// Service worker: makes the app installable and keeps static assets
 // fast. API responses and pages are never cached (they're private and live).
-const STATIC_CACHE = "office-static-v2";
+const STATIC_CACHE = "static-v3";
 
 self.addEventListener("install", () => self.skipWaiting());
 
@@ -14,10 +14,10 @@ self.addEventListener("activate", (event) => {
 });
 
 const OFFLINE_HTML = `<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Office</title><body style="margin:0;min-height:100vh;display:grid;place-items:center;
+<title>Day Planner</title><body style="margin:0;min-height:100vh;display:grid;place-items:center;
 font:16px -apple-system,system-ui,sans-serif;background:#121315;color:#f2eee6">
 <div style="text-align:center;padding:24px"><p style="font-weight:600;margin:0 0 6px">You're offline</p>
-<p style="opacity:.6;margin:0">Office will reconnect when you're back online.</p></div>`;
+<p style="opacity:.6;margin:0">Your list will be here when you're back online.</p></div>`;
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
@@ -49,15 +49,16 @@ self.addEventListener("fetch", (event) => {
 
 // Push "nudges" arrive with no payload. Show a random, generic line that says
 // nothing about the app, the sender or the content.
+// Lines a day-planner app would plausibly send.
 const NUDGES = [
-  ["Reminder", "Your weekly summary is ready."],
-  ["Update", "Something new is waiting for you."],
   ["Reminder", "Don't forget to check your list today."],
-  ["Sync complete", "Your items are up to date."],
-  ["Heads up", "You have a new update."],
+  ["Today", "You have something on your list."],
   ["Reminder", "Take a short break and stretch."],
-  ["Backup", "Your backup finished successfully."],
-  ["Today", "A new tip is available."],
+  ["Planner", "Your weekly summary is ready."],
+  ["Today", "A good time to plan the rest of your day."],
+  ["Reminder", "Drink a glass of water."],
+  ["Planner", "Your list is up to date."],
+  ["Today", "Small steps count. Tick one thing off."],
 ];
 
 self.addEventListener("push", (event) => {
