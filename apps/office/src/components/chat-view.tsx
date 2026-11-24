@@ -7,6 +7,8 @@ import {
   Check,
   CheckCheck,
   ChevronLeft,
+  Eye,
+  ImagePlus,
   LockKeyhole,
   Megaphone,
   Pencil,
@@ -22,6 +24,16 @@ import { useApp, usePolling } from "@/components/app-provider";
 import { Avatar } from "@/components/avatar";
 import { UnlockCard } from "@/components/unlock-card";
 import { decryptMessage, encryptMessage, messageAad } from "@/lib/crypto";
+import { prepareImage, type PreparedImage } from "@/lib/image";
+import {
+  encodePhotoPayload,
+  encryptPhoto,
+  parseBody,
+  type PhotoKind,
+  type PhotoPayload,
+  photoAad,
+} from "@/lib/photo";
+import { OnceViewer, PhotoLightbox, type PhotoRef, PhotoThumb } from "@/components/photo-views";
 import { timeLabel, ttlLabel } from "@/lib/format";
 import { personPlanLabel, withDuePlan } from "@/lib/plan";
 import { ADMIN_USERNAME, MAX_MESSAGE_CHARS } from "@/lib/constants";
@@ -71,7 +83,19 @@ interface WireMessage {
 }
 
 type Body =
-  { kind: "text"; text: string } | { kind: "no-key" } | { kind: "failed" } | { kind: "pending" };
+  | { kind: "text"; text: string }
+  | { kind: "photo"; photo: PhotoPayload; localUrl?: string }
+  | { kind: "no-key" }
+  | { kind: "failed" }
+  | { kind: "pending" };
+
+interface PhotoInfo {
+  id: string;
+  messageId: string;
+  kind: PhotoKind;
+  available: boolean;
+  viewers: string[];
+}
 
 interface Item {
   id: string;
@@ -87,6 +111,10 @@ interface Item {
 
 /** First line of a message, shortened, for reply quotes. */
 function snippet(body: Body | undefined) {
+  if (body?.kind === "photo") {
+    const label = body.photo.kind === "once" ? "One-time photo" : "Photo";
+    return body.photo.caption ? `${label} · ${body.photo.caption}` : label;
+  }
   if (!body || body.kind !== "text") return "Message";
   const line = body.text.split("\n")[0]!.trim();
   return line.length > 80 ? `${line.slice(0, 80)}…` : line;
@@ -108,6 +136,15 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
+  const filePicker = useRef<HTMLInputElement>(null);
+  const [photos, setPhotos] = useState<Map<string, PhotoInfo>>(new Map());
+  const [pendingPhoto, setPendingPhoto] = useState<{
+    image: PreparedImage;
+    url: string;
+    kind: PhotoKind;
+  } | null>(null);
+  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [onceOpen, setOnceOpen] = useState<PhotoRef | null>(null);
   const wire = useRef<Map<string, WireMessage>>(new Map());
   const cursor = useRef<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -149,7 +186,11 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                 identity.privateKey,
                 messageAad(conversationId, m.senderId, m.id),
               );
-              body = { kind: "text", text };
+              const parsed = parseBody(text);
+              body =
+                parsed.type === "photo"
+                  ? { kind: "photo", photo: parsed }
+                  : { kind: "text", text: parsed.text };
             } catch {
               body = { kind: "failed" };
             }
@@ -197,7 +238,9 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       reads: ReadState[];
       reactions: WireReaction[];
       liveIds: string[];
+      photos: PhotoInfo[];
     };
+    setPhotos(new Map(data.photos.map((p) => [p.messageId, p])));
     const { messages } = data;
     setReads(data.reads);
     if (version === reactionsVersion.current) setReactions(data.reactions);
@@ -407,11 +450,108 @@ export function ChatView({ conversationId }: { conversationId: string }) {
     }
   }
 
+  async function pickPhoto(file: File | undefined) {
+    if (!file) return;
+    setNotice(null);
+    try {
+      const image = await prepareImage(file);
+      const url = URL.createObjectURL(new Blob([image.bytes], { type: image.mime }));
+      setPendingPhoto({ image, url, kind: "once" });
+      setEditing(null);
+      composer.current?.focus();
+    } catch {
+      setNotice("Couldn't read that photo.");
+    }
+  }
+
+  function dropPhoto() {
+    if (pendingPhoto) URL.revokeObjectURL(pendingPhoto.url);
+    setPendingPhoto(null);
+  }
+
+  /** Encrypts the photo with its own key, and puts that key inside the encrypted message. */
+  async function sendPhoto(caption: string) {
+    if (!pendingPhoto || !identity || !meId || !conversation) return;
+    const { image, url, kind } = pendingPhoto;
+    const id = crypto.randomUUID();
+    const replyToId = replyTo;
+    setReplyTo(null);
+    setPendingPhoto(null);
+    setDraft("");
+    stickToBottom.current = true;
+    const placeholder: PhotoPayload = {
+      type: "photo",
+      kind,
+      key: "",
+      mime: image.mime,
+      width: image.width,
+      height: image.height,
+      caption,
+    };
+    const localUrl = kind === "normal" ? url : undefined;
+    const optimistic: Item = {
+      id,
+      senderId: meId,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + (state?.ttlHours ?? 24) * 3_600_000).toISOString(),
+      body: { kind: "photo", photo: placeholder, localUrl },
+      replyToId,
+      sending: true,
+    };
+    setItems((prev) => new Map(prev).set(id, optimistic));
+    try {
+      const photo = await encryptPhoto(image.bytes, photoAad(conversation.id, meId, id));
+      const payload = encodePhotoPayload({
+        kind,
+        key: photo.key,
+        mime: image.mime,
+        width: image.width,
+        height: image.height,
+        caption,
+      });
+      const encrypted = await encryptMessage(
+        payload,
+        identity,
+        recipientsFor(conversation, meId, identity.publicKey),
+        messageAad(conversation.id, meId, id),
+      );
+      const response = await fetch(`/api/conversations/${conversation.id}/messages`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id,
+          replyToId,
+          senderPublicKey: identity.publicKey,
+          ...encrypted,
+          attachment: { kind, ciphertext: photo.ciphertext, iv: photo.iv },
+        }),
+      });
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? "Couldn't send the photo.");
+      }
+      const saved = (await response.json()) as { createdAt: string; expiresAt: string };
+      setItems((prev) =>
+        new Map(prev).set(id, {
+          ...optimistic,
+          ...saved,
+          body: { kind: "photo", photo: { ...placeholder, key: photo.key }, localUrl },
+          sending: false,
+        }),
+      );
+      if (kind === "once") URL.revokeObjectURL(url);
+    } catch (error) {
+      setItems((prev) => new Map(prev).set(id, { ...optimistic, sending: false, error: true }));
+      setNotice(error instanceof Error ? error.message : "Couldn't send the photo.");
+    }
+  }
+
   async function send() {
     const text = draft.trim();
-    if (!text || !identity || !meId || !conversation) return;
+    if ((!text && !pendingPhoto) || !identity || !meId || !conversation) return;
     setNotice(null);
     if (editing) return saveEdit(editing, text);
+    if (pendingPhoto) return sendPhoto(text);
     const replyToId = replyTo;
     setReplyTo(null);
     const id = crypto.randomUUID();
@@ -602,7 +742,18 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                         )}
                       </button>
                     ) : null}
-                    {item.body.kind === "text" ? (
+                    {item.body.kind === "photo" ? (
+                      <PhotoBody
+                        item={item}
+                        body={item.body}
+                        mine={mine}
+                        meId={meId ?? ""}
+                        conversationId={conversationId}
+                        info={photos.get(item.id)}
+                        onLightbox={setLightbox}
+                        onOpenOnce={setOnceOpen}
+                      />
+                    ) : item.body.kind === "text" ? (
                       item.body.text
                     ) : (
                       <span className="text-[var(--ink-2)] italic">
@@ -635,7 +786,9 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                     </div>
                   ) : null}
 
-                  {selected && !mine && item.body.kind === "text" ? (
+                  {selected &&
+                  !mine &&
+                  (item.body.kind === "text" || item.body.kind === "photo") ? (
                     <div className="glass-strong rise mt-1 flex gap-1 rounded-full p-1">
                       {(["up", "down"] as const).map((kind) => (
                         <button
@@ -760,6 +913,42 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                 {notice}
               </p>
             ) : null}
+            {pendingPhoto ? (
+              <div className="glass mx-auto mb-1.5 flex max-w-3xl items-center gap-3 rounded-2xl p-2 text-sm">
+                {/* eslint-disable-next-line @next/next/no-img-element -- local preview of your own photo */}
+                <img
+                  src={pendingPhoto.url}
+                  alt=""
+                  className="size-12 shrink-0 rounded-lg object-cover"
+                />
+                <div className="seg min-w-0 flex-1" role="group" aria-label="Photo type">
+                  <button
+                    type="button"
+                    aria-pressed={pendingPhoto.kind === "once"}
+                    onClick={() => setPendingPhoto({ ...pendingPhoto, kind: "once" })}
+                  >
+                    View once
+                  </button>
+                  {state?.photosAllowed ? (
+                    <button
+                      type="button"
+                      aria-pressed={pendingPhoto.kind === "normal"}
+                      onClick={() => setPendingPhoto({ ...pendingPhoto, kind: "normal" })}
+                    >
+                      Keep in chat
+                    </button>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  aria-label="Remove photo"
+                  onClick={dropPhoto}
+                  className="grid size-8 shrink-0 place-items-center rounded-full hover:bg-[var(--hairline)]"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            ) : null}
             {replyTo || editing ? (
               <div className="glass mx-auto mb-1.5 flex max-w-3xl items-center gap-2 rounded-2xl py-1.5 pr-1.5 pl-3 text-sm">
                 {editing ? (
@@ -802,6 +991,30 @@ export function ChatView({ conversationId }: { conversationId: string }) {
               }}
               className="glass-strong mx-auto flex max-w-3xl items-end gap-2 rounded-[1.6rem] p-1.5 pl-4"
             >
+              {!editing ? (
+                <>
+                  <input
+                    ref={filePicker}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    aria-label="Choose a photo"
+                    onChange={(e) => {
+                      void pickPhoto(e.target.files?.[0]);
+                      e.target.value = "";
+                    }}
+                  />
+                  <button
+                    type="button"
+                    aria-label="Add a photo"
+                    disabled={identityStatus !== "ready"}
+                    onClick={() => filePicker.current?.click()}
+                    className="-ml-2.5 grid size-10 shrink-0 place-items-center rounded-full text-[var(--ink-2)] hover:bg-[var(--hairline)] disabled:opacity-40"
+                  >
+                    <ImagePlus size={20} />
+                  </button>
+                </>
+              ) : null}
               <textarea
                 ref={composer}
                 value={draft}
@@ -818,7 +1031,13 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                   }
                 }}
                 rows={1}
-                placeholder={identityStatus === "ready" ? "Message" : "Unlock to send messages"}
+                placeholder={
+                  identityStatus !== "ready"
+                    ? "Unlock to send messages"
+                    : pendingPhoto
+                      ? "Add a caption"
+                      : "Message"
+                }
                 disabled={identityStatus !== "ready"}
                 aria-label="Message"
                 className="field-sizing-content max-h-40 min-h-10 flex-1 resize-none bg-transparent py-2 text-base outline-none placeholder:text-[var(--ink-3)]"
@@ -826,7 +1045,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
               <button
                 type="submit"
                 aria-label={editing ? "Save edit" : "Send"}
-                disabled={!draft.trim() || identityStatus !== "ready"}
+                disabled={(!draft.trim() && !pendingPhoto) || identityStatus !== "ready"}
                 className="btn btn-primary size-10 shrink-0 p-0"
               >
                 {editing ? (
@@ -839,7 +1058,117 @@ export function ChatView({ conversationId }: { conversationId: string }) {
           </>
         )}
       </footer>
+      {lightbox ? <PhotoLightbox url={lightbox} onClose={() => setLightbox(null)} /> : null}
+      {onceOpen ? (
+        <OnceViewer
+          photo={onceOpen}
+          onClose={(viewed) => {
+            const ref = onceOpen;
+            setOnceOpen(null);
+            if (viewed && meId) {
+              setPhotos((prev) => {
+                const info = prev.get(ref.messageId);
+                if (!info || info.viewers.includes(meId)) return prev;
+                return new Map(prev).set(ref.messageId, {
+                  ...info,
+                  viewers: [...info.viewers, meId],
+                });
+              });
+            }
+          }}
+        />
+      ) : null}
     </main>
+  );
+}
+
+/** A photo inside a bubble: the picture for ordinary photos, a sealed tile for one-time ones. */
+function PhotoBody({
+  item,
+  body,
+  mine,
+  meId,
+  conversationId,
+  info,
+  onLightbox,
+  onOpenOnce,
+}: {
+  item: Item;
+  body: Extract<Body, { kind: "photo" }>;
+  mine: boolean;
+  meId: string;
+  conversationId: string;
+  info: PhotoInfo | undefined;
+  onLightbox: (url: string) => void;
+  onOpenOnce: (photo: PhotoRef) => void;
+}) {
+  const { photo } = body;
+  const ref: PhotoRef | null =
+    info && photo.key
+      ? {
+          attachmentId: info.id,
+          conversationId,
+          senderId: item.senderId,
+          messageId: item.id,
+          photoKey: photo.key,
+          mime: photo.mime,
+        }
+      : null;
+  const caption = photo.caption ? <span className="mt-1.5 block">{photo.caption}</span> : null;
+
+  if (photo.kind === "normal") {
+    return (
+      <span className="-mx-1.5 -mt-0.5 block">
+        <PhotoThumb
+          photo={ref}
+          width={photo.width}
+          height={photo.height}
+          localUrl={body.localUrl}
+          onOpen={onLightbox}
+        />
+        {caption ? <span className="block px-1.5">{caption}</span> : null}
+      </span>
+    );
+  }
+
+  const opened = info?.viewers.includes(meId) ?? false;
+  const canOpen = !mine && !!ref && !!info?.available && !opened && !item.sending;
+  const status = mine
+    ? info && info.viewers.length > 0
+      ? `Opened${info.viewers.length > 1 ? ` by ${info.viewers.length}` : ""}`
+      : "Not opened yet"
+    : opened || (info && !info.available)
+      ? "Opened"
+      : "Tap to view once";
+  return (
+    <span className="block">
+      <button
+        type="button"
+        disabled={!canOpen}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (canOpen && ref) onOpenOnce(ref);
+        }}
+        className={cn(
+          "flex items-center gap-2.5 rounded-xl py-1 pr-2 text-left",
+          canOpen ? "cursor-pointer" : "cursor-default",
+        )}
+      >
+        <span
+          className={cn(
+            "grid size-9 shrink-0 place-items-center rounded-full",
+            mine ? "bg-[color-mix(in_oklab,var(--mine-ink)_14%,transparent)]" : "bg-[var(--field)]",
+          )}
+        >
+          <Eye size={17} />
+        </span>
+        <span>
+          <span className="block font-semibold">Photo · view once</span>
+          <span className="block text-xs opacity-70">{status}</span>
+        </span>
+      </button>
+      {caption}
+    </span>
   );
 }
 

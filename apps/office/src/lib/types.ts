@@ -35,6 +35,7 @@ export interface AppState {
   chats: ChatSummary[];
   ttlHours: number;
   pendingInvites: number;
+  photosAllowed: boolean;
   admin: { securityAlerts: number; loginsDisabled: boolean } | null;
 }
 

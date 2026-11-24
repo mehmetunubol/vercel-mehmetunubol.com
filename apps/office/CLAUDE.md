@@ -34,12 +34,8 @@ setup and the encryption design.
   name, sender, title or message text into a push or a notification.
 - Panic switch "disable sign-ins" exempts only `ADMIN_USERNAME`, and blocked
   users must see the same "locked" message as a real lockout.
-
-## Backlog (requested, not built)
-
-- **One-time-view photos** in chats: shown once, then deleted. The user asked to
-  keep this for later. Open design points: encrypt the image client-side like
-  messages; store blobs outside Postgres (Neon free tier is small), e.g.
-  Vercel Blob; delete the blob after the recipient has viewed it (and on
-  expiry); in groups, decide whether "seen" means seen by one person or by
-  everyone. Screenshots can't be prevented on the web, so say so in the UI.
+- Photos (`lib/photo.ts`, `components/photo-views.tsx`): the photo key lives
+  inside the E2E-encrypted message; the server stores only ciphertext in
+  `attachments`. One-time photos: never serve them to the sender, record a view
+  per recipient (`attachment_views`), erase the ciphertext once all recipients
+  have viewed. Don't add server-side image processing (thumbnails, previews).

@@ -209,3 +209,37 @@ export const adminLog = pgTable(
   },
   (t) => [index("admin_log_created_idx").on(t.createdAt)],
 );
+
+export const attachmentKindEnum = pgEnum("attachment_kind", ["once", "normal"]);
+
+// A photo sent with a message. The bytes are AES-GCM ciphertext; the key is
+// inside the (end-to-end encrypted) message, so the server can't open it.
+// "once" photos: each recipient may fetch it a single time; the ciphertext is
+// erased when everyone has. Rows go with their message (expiry, delete, purge).
+export const attachments = pgTable("attachments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  messageId: uuid("message_id")
+    .notNull()
+    .unique()
+    .references(() => messages.id, { onDelete: "cascade" }),
+  kind: attachmentKindEnum("kind").notNull(),
+  // base64; null once a one-time photo has been seen by everyone.
+  ciphertext: text("ciphertext"),
+  iv: varchar("iv", { length: 32 }).notNull(),
+  size: integer("size").notNull(),
+  createdAt: tz("created_at").defaultNow().notNull(),
+});
+
+export const attachmentViews = pgTable(
+  "attachment_views",
+  {
+    attachmentId: uuid("attachment_id")
+      .notNull()
+      .references(() => attachments.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    viewedAt: tz("viewed_at").defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.attachmentId, t.userId] })],
+);

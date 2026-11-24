@@ -57,6 +57,13 @@
       "when": 1795379085186,
       "tag": "0007_replies_edits_admin_log",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795523214654,
+      "tag": "0008_photos",
+      "breakpoints": true
     }
   ]
 }

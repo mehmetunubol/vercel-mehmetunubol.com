@@ -12,7 +12,7 @@ import {
 import { deleteOldAdminLog } from "@/lib/admin-log";
 import { getCurrentUser } from "@/lib/session";
 import { applyDuePlans } from "@/lib/presence";
-import { getLoginsDisabled, getMessageTtlHours } from "@/lib/settings";
+import { getLoginsDisabled, getMessageTtlHours, getPhotosAllowed } from "@/lib/settings";
 import { EmergencyPanel } from "@/components/emergency-panel";
 import { LocalTime } from "@/components/local-time";
 import { ADMIN_USERNAME, MAX_MESSAGE_TTL_HOURS, MIN_MESSAGE_TTL_HOURS } from "@/lib/constants";
@@ -27,6 +27,7 @@ import {
   unlockUser,
   renameUser,
   resetPassword,
+  savePhotoSettings,
   saveSettings,
   updateGroup,
 } from "./actions";
@@ -132,36 +133,38 @@ export default async function AdminPage() {
   await applyDuePlans();
 
   await deleteOldAdminLog();
-  const [people, groups, members, ttlHours, alerts, loginsDisabled, activity] = await Promise.all([
-    db.select().from(users).orderBy(asc(users.displayName)),
-    db
-      .select()
-      .from(conversations)
-      .where(eq(conversations.kind, "group"))
-      .orderBy(asc(conversations.name)),
-    db
-      .select({
-        conversationId: conversationMembers.conversationId,
-        userId: conversationMembers.userId,
-      })
-      .from(conversationMembers)
-      .innerJoin(conversations, eq(conversations.id, conversationMembers.conversationId))
-      .where(eq(conversations.kind, "group")),
-    getMessageTtlHours(),
-    db
-      .select({
-        id: securityAlerts.id,
-        kind: securityAlerts.kind,
-        userId: securityAlerts.userId,
-        createdAt: securityAlerts.createdAt,
-        seenAt: securityAlerts.seenAt,
-      })
-      .from(securityAlerts)
-      .orderBy(desc(securityAlerts.createdAt))
-      .limit(20),
-    getLoginsDisabled(),
-    db.select().from(adminLog).orderBy(desc(adminLog.createdAt)).limit(50),
-  ]);
+  const [people, groups, members, ttlHours, alerts, loginsDisabled, activity, photosAllowed] =
+    await Promise.all([
+      db.select().from(users).orderBy(asc(users.displayName)),
+      db
+        .select()
+        .from(conversations)
+        .where(eq(conversations.kind, "group"))
+        .orderBy(asc(conversations.name)),
+      db
+        .select({
+          conversationId: conversationMembers.conversationId,
+          userId: conversationMembers.userId,
+        })
+        .from(conversationMembers)
+        .innerJoin(conversations, eq(conversations.id, conversationMembers.conversationId))
+        .where(eq(conversations.kind, "group")),
+      getMessageTtlHours(),
+      db
+        .select({
+          id: securityAlerts.id,
+          kind: securityAlerts.kind,
+          userId: securityAlerts.userId,
+          createdAt: securityAlerts.createdAt,
+          seenAt: securityAlerts.seenAt,
+        })
+        .from(securityAlerts)
+        .orderBy(desc(securityAlerts.createdAt))
+        .limit(20),
+      getLoginsDisabled(),
+      db.select().from(adminLog).orderBy(desc(adminLog.createdAt)).limit(50),
+      getPhotosAllowed(),
+    ]);
   const unseen = alerts.filter((a) => !a.seenAt).length;
   const now = new Date();
   const membersOf = (groupId: string) =>
@@ -431,6 +434,27 @@ export default async function AdminPage() {
                 aria-label="Hours"
               />
               <span className="text-sm text-[var(--ink-2)]">hours</span>
+            </label>
+          </ActionForm>
+          <ActionForm
+            action={savePhotoSettings}
+            submitLabel="Save"
+            className="mt-4 space-y-3 border-t border-[var(--hairline)] pt-4"
+          >
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                name="photosAllowed"
+                defaultChecked={photosAllowed}
+                className="mt-0.5 size-4 accent-[var(--ink)]"
+              />
+              <span>
+                <span className="block text-sm font-medium">Allow ordinary photos</span>
+                <span className="block text-xs text-[var(--ink-2)]">
+                  Photos that stay in the chat until the message expires. When off, only one-time
+                  photos can be sent: each person can view them once, then they&rsquo;re deleted.
+                </span>
+              </span>
             </label>
           </ActionForm>
         </div>

@@ -1,8 +1,8 @@
 # Browser tests
 
-Six Playwright suites that drive the real app in a browser, the way people use
+Seven Playwright suites that drive the real app in a browser, the way people use
 it: the sign-in gate, chats and encryption, presence, events, security and
-push notifications. They run in order, because later suites use the people and
+push notifications, and photos. They run in order, because later suites use the people and
 chats created by earlier ones.
 
 | Suite         | Covers                                                                                                                                                                                                 |
@@ -13,6 +13,7 @@ chats created by earlier ones.
 | `04-events`   | Creating, inviting, answers, the calendar, privacy, editing, cancelling                                                                                                                                |
 | `05-security` | Lockout alerts, Unlock now, both panic buttons, Delete all events, the activity log                                                                                                                    |
 | `06-push`     | Who gets a nudge, the one-per-minute limit, that the push carries nothing, what the phone shows                                                                                                        |
+| `07-photos`   | One-time photos (view once, the sender can't open them, erased after everyone has seen them, the viewer closes when you leave the app), ordinary photos and the admin switch                           |
 
 ## Running them
 

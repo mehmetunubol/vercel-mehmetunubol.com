@@ -49,3 +49,12 @@ export async function getLoginsDisabled() {
 export async function setLoginsDisabled(disabled: boolean) {
   await setSetting("logins_disabled", disabled ? "true" : "false");
 }
+
+/** Admin switch: ordinary photos (kept in the chat). One-time photos are always allowed. */
+export async function getPhotosAllowed() {
+  return (await getSetting("photos_allowed")) === "true";
+}
+
+export async function setPhotosAllowed(allowed: boolean) {
+  await setSetting("photos_allowed", allowed ? "true" : "false");
+}

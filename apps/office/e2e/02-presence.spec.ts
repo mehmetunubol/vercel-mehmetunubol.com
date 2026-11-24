@@ -1,5 +1,5 @@
 import { type Page, test } from "@playwright/test";
-import { ok, signIn } from "./helpers";
+import { localDay, ok, signIn } from "./helpers";
 
 // Scheduled "back in / leaving at" changes and the In / Out lists.
 // Runs after the earlier suites, against the data they created.
@@ -32,15 +32,20 @@ test("presence: in/out lists and scheduled status changes", async ({ browser }) 
   );
   ok(t.includes("IN THE OFFICE\n· 0"), "In list rendered with count");
 
-  // Change to a specific day, morning (25.11.2026 morning).
+  // Change to a specific day, morning: three days ahead, so it's named by weekday.
+  const target = await localDay(admin, 3);
+  const dayName = await admin.evaluate((iso) => {
+    const d = new Date(`${iso}T12:00`);
+    return `${d.toLocaleDateString("en-GB", { weekday: "short" })} ${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`;
+  }, target);
   await admin.click("text=tap to change");
   await admin.click('[role=tab]:has-text("Pick a day")');
-  await admin.fill("input[aria-label=Day]", "2026-11-25");
+  await admin.fill("input[aria-label=Day]", target);
   await admin.click('.chip:has-text("Morning")');
-  await admin.waitForSelector("text=Back Wed 25 Nov, morning");
+  await admin.waitForSelector(`text=Back ${dayName}, morning`);
   await admin.click('button:has-text("Save")');
-  await admin.waitForSelector("text=Wed 25 Nov, 09:00 · tap to change");
-  ok(true, 'scheduled "25.11.2026 morning" (09:00)');
+  await admin.waitForSelector(`text=${dayName}, 09:00 · tap to change`);
+  ok(true, `scheduled "${dayName}, morning" (09:00)`);
 
   // Past time is rejected in the UI.
   await admin.click("text=tap to change");

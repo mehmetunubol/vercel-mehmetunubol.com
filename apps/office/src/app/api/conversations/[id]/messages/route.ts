@@ -1,10 +1,16 @@
 import { and, asc, desc, eq, gt, gte, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { conversationMembers, messageReactions, messages } from "@/lib/db/schema";
+import {
+  attachments,
+  attachmentViews,
+  conversationMembers,
+  messageReactions,
+  messages,
+} from "@/lib/db/schema";
 import { deleteExpiredMessages } from "@/lib/cleanup";
 import { getConversation, isMember, isUuid } from "@/lib/conversations";
 import { notifyUsers } from "@/lib/push";
-import { getMessageTtlHours } from "@/lib/settings";
+import { getMessageTtlHours, getPhotosAllowed } from "@/lib/settings";
 import { badRequest, forbidden, getCurrentUser, unauthorized } from "@/lib/session";
 import { sendMessageSchema } from "@/lib/validation";
 
@@ -67,7 +73,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   // Read state and reactions are small and change on older messages too, so
   // every poll returns them in full for the conversation.
-  const [reads, reactions, liveIds] = await Promise.all([
+  const [reads, reactions, liveIds, photoRows, photoViews] = await Promise.all([
     db
       .select({
         userId: conversationMembers.userId,
@@ -91,9 +97,31 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       .from(messages)
       .where(and(eq(messages.conversationId, id), live))
       .then((r) => r.map((m) => m.id)),
+    db
+      .select({
+        id: attachments.id,
+        messageId: attachments.messageId,
+        kind: attachments.kind,
+        size: attachments.size,
+        available: sql<boolean>`${attachments.ciphertext} is not null`,
+      })
+      .from(attachments)
+      .innerJoin(messages, eq(messages.id, attachments.messageId))
+      .where(and(eq(messages.conversationId, id), live)),
+    db
+      .select({ attachmentId: attachmentViews.attachmentId, userId: attachmentViews.userId })
+      .from(attachmentViews)
+      .innerJoin(attachments, eq(attachments.id, attachmentViews.attachmentId))
+      .innerJoin(messages, eq(messages.id, attachments.messageId))
+      .where(and(eq(messages.conversationId, id), live)),
   ]);
+  // Photo details (never the bytes) and, for one-time photos, who has opened them.
+  const photos = photoRows.map((p) => ({
+    ...p,
+    viewers: photoViews.filter((v) => v.attachmentId === p.id).map((v) => v.userId),
+  }));
 
-  return Response.json({ messages: rows, reads, reactions, liveIds });
+  return Response.json({ messages: rows, reads, reactions, liveIds, photos });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -108,6 +136,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const parsed = sendMessageSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest("invalid message");
   const body = parsed.data;
+  if (body.attachment?.kind === "normal" && !(await getPhotosAllowed())) {
+    return Response.json(
+      { error: "Ordinary photos are turned off. Send it as a one-time photo." },
+      { status: 403 },
+    );
+  }
   // A reply must point at a live message in the same conversation; otherwise drop it.
   let replyToId: string | null = null;
   if (body.replyToId) {
@@ -150,6 +184,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .onConflictDoNothing()
     .returning({ id: messages.id, createdAt: messages.createdAt, expiresAt: messages.expiresAt });
   if (!row) return Response.json({ error: "duplicate id" }, { status: 409 });
+  if (body.attachment) {
+    try {
+      await db.insert(attachments).values({
+        messageId: row.id,
+        kind: body.attachment.kind,
+        ciphertext: body.attachment.ciphertext,
+        iv: body.attachment.iv,
+        size: Math.floor((body.attachment.ciphertext.length * 3) / 4),
+      });
+    } catch (error) {
+      // Don't leave a photo message without its photo.
+      await db.delete(messages).where(eq(messages.id, row.id));
+      throw error;
+    }
+  }
   notifyUsers(conversation.members.map((m) => m.id).filter((uid) => uid !== me.id));
   return Response.json(row);
 }

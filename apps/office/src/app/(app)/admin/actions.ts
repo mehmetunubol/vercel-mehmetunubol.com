@@ -9,7 +9,7 @@ import { conversationMembers, conversations, messages, users } from "@/lib/db/sc
 import { ADMIN_USERNAME, MIN_PASSWORD_LENGTH, USERNAME_PATTERN } from "@/lib/constants";
 import { getCurrentUser } from "@/lib/session";
 import { markAllAlertsSeen } from "@/lib/security";
-import { setLoginsDisabled, setMessageTtlHours } from "@/lib/settings";
+import { setLoginsDisabled, setMessageTtlHours, setPhotosAllowed } from "@/lib/settings";
 import { logAdmin } from "@/lib/admin-log";
 import { events } from "@/lib/db/schema";
 
@@ -292,4 +292,19 @@ export async function setSignInsDisabled(disabled: boolean): Promise<ActionResul
   return done(
     disabled ? "Sign-ins disabled. Everyone else has been signed out." : "Sign-ins enabled again.",
   );
+}
+
+/** Ordinary photos (kept in the chat) on or off. One-time photos are always allowed. */
+export async function savePhotoSettings(
+  _: ActionResult | null,
+  form: FormData,
+): Promise<ActionResult> {
+  await requireAdmin();
+  const allowed = form.get("photosAllowed") === "on";
+  await setPhotosAllowed(allowed);
+  await logAdmin(
+    "settings.photos",
+    allowed ? "Allowed ordinary photos" : "Turned off ordinary photos",
+  );
+  return done(allowed ? "Ordinary photos are allowed." : "Only one-time photos can be sent now.");
 }

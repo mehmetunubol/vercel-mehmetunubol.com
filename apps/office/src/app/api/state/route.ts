@@ -5,7 +5,7 @@ import { deleteExpiredMessages } from "@/lib/cleanup";
 import { pendingInviteCount } from "@/lib/events";
 import { applyDuePlans } from "@/lib/presence";
 import { deleteOldAlerts, unseenAlertCount } from "@/lib/security";
-import { getLoginsDisabled, getMessageTtlHours } from "@/lib/settings";
+import { getLoginsDisabled, getMessageTtlHours, getPhotosAllowed } from "@/lib/settings";
 import { getCurrentUser, unauthorized } from "@/lib/session";
 import { ADMIN_USERNAME } from "@/lib/constants";
 
@@ -17,7 +17,7 @@ export async function GET() {
   if (!me) return unauthorized();
   await Promise.all([deleteExpiredMessages(), applyDuePlans()]);
 
-  const [people, myConversations, ttlHours, pendingInvites] = await Promise.all([
+  const [people, myConversations, ttlHours, pendingInvites, photosAllowed] = await Promise.all([
     db
       .select({
         id: users.id,
@@ -55,6 +55,7 @@ export async function GET() {
       .where(eq(conversationMembers.userId, me.id)),
     getMessageTtlHours(),
     pendingInviteCount(me.id),
+    getPhotosAllowed(),
   ]);
 
   const ids = myConversations.map((c) => c.id);
@@ -98,6 +99,7 @@ export async function GET() {
     chats,
     ttlHours,
     pendingInvites,
+    photosAllowed,
     // Admin only: unseen security alerts and whether the sign-in panic switch is on.
     admin: me.isAdmin
       ? await Promise.all([unseenAlertCount(), getLoginsDisabled(), deleteOldAlerts()]).then(

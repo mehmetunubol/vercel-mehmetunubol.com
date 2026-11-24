@@ -32,9 +32,19 @@ export const encryptedBodySchema = z.object({
   keys: z.record(z.uuid(), base64(200)),
 });
 
+// About 2.6 MB of photo once base64-encoded; the app sends ~300 KB.
+export const MAX_PHOTO_BASE64 = 3_600_000;
+
 export const sendMessageSchema = encryptedBodySchema.extend({
   id: z.uuid(),
   replyToId: z.uuid().nullable().optional(),
+  attachment: z
+    .object({
+      kind: z.enum(["once", "normal"]),
+      ciphertext: base64(MAX_PHOTO_BASE64),
+      iv: base64(32),
+    })
+    .optional(),
 });
 
 export const presenceSchema = z

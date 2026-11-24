@@ -22,6 +22,18 @@
     shown from each device's own decrypted copy). Your own messages can be
     edited, re-encrypted on your device and marked "edited", or deleted for
     everyone.
+  - **Photos**: the phone shrinks each photo, strips its hidden data (GPS
+    location, camera details), and encrypts it with its own key, which travels
+    inside the encrypted message. The server only stores the encrypted bytes.
+    - _One-time photos_ (always available): each recipient can open one once,
+      viewing it only while holding a finger on it, for 10 seconds in total.
+      It's drawn so there's no "Save image" option, and it closes if you leave
+      the app. The sender can't reopen it and sees "Opened" / "Opened by N".
+      The server erases the photo once every recipient has opened it, or when
+      the message expires. Screenshots can't be blocked by any web app (or any
+      app on iPhone).
+    - _Ordinary photos_ stay in the chat until the message expires. Admin →
+      Messages → "Allow ordinary photos" turns them on (off by default).
   - **Reactions**: 👍 / 👎 on received messages, one per person per message.
 - **Events**: anyone can plan an event with a title, a date and start time,
   an estimated duration and an optional description (up to 500 characters),
@@ -133,7 +145,7 @@ public keys, password-encrypted private keys, and ciphertext.
   user gets a new key pair and loses access to messages sent to them before the
   reset. Both actions sign the user out on every other device.
 
-Not encrypted: status and scheduled changes, read times, reactions, and events (title, description, time, invitees and answers) (who
+Not encrypted: status and scheduled changes, read times, reactions, and events (title, description, time, invitees and answers), and which photos were opened by whom (who
 reacted 👍/👎 to which message id). These are metadata the app needs to show
 everyone; message text stays encrypted.
 
