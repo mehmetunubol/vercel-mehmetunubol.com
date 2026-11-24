@@ -11,6 +11,7 @@ import {
 } from "@/lib/db/schema";
 import { deleteOldAdminLog } from "@/lib/admin-log";
 import { IP_FAILURE_LIMIT, IP_WINDOW_MINUTES } from "@/lib/guessing";
+import { FREE_PLAN_STORAGE_BYTES, formatBytes, getHealth } from "@/lib/health";
 import { getCurrentUser } from "@/lib/session";
 import { applyDuePlans } from "@/lib/presence";
 import { getLoginsDisabled, getMessageTtlHours, getPhotosAllowed } from "@/lib/settings";
@@ -168,6 +169,8 @@ export default async function AdminPage() {
       db.select().from(adminLog).orderBy(desc(adminLog.createdAt)).limit(50),
       getPhotosAllowed(),
     ]);
+  const health = await getHealth();
+  const storageShare = Math.min(1, health.databaseBytes / FREE_PLAN_STORAGE_BYTES);
   const unseen = alerts.filter((a) => !a.seenAt).length;
   const now = new Date();
   const membersOf = (groupId: string) =>
@@ -180,6 +183,61 @@ export default async function AdminPage() {
         <p className="eyebrow">Administration</p>
         <h1 className="mt-1 text-3xl font-semibold">People &amp; groups</h1>
       </header>
+
+      <Section
+        title="Health"
+        hint="Usage at a glance. Counts only; nothing here reads message content."
+      >
+        <div className="space-y-4 px-3 pb-3">
+          <div>
+            <div className="flex items-baseline justify-between text-sm">
+              <span className="font-medium">Database storage</span>
+              <span className="text-[var(--ink-2)] tabular-nums">
+                {formatBytes(health.databaseBytes)} of {formatBytes(FREE_PLAN_STORAGE_BYTES)} (free
+                plan)
+              </span>
+            </div>
+            <div
+              className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--field)]"
+              role="meter"
+              aria-label="Database storage used"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(storageShare * 100)}
+            >
+              <div
+                className={`h-full rounded-full ${storageShare > 0.8 ? "bg-[var(--danger)]" : "bg-[var(--ink-2)]"}`}
+                style={{ width: `${Math.max(2, storageShare * 100)}%` }}
+              />
+            </div>
+            <p className="mt-1.5 text-xs text-[var(--ink-3)]">
+              Largest:{" "}
+              {health.largestTables.map((t) => `${t.name} ${formatBytes(t.bytes)}`).join(" · ")}
+            </p>
+          </div>
+          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {[
+              ["Photos & clips stored", `${health.photoCount} · ${formatBytes(health.photoBytes)}`],
+              ["Messages", String(health.messages)],
+              ["Upcoming events", String(health.upcomingEvents)],
+              ["People", String(health.people)],
+              ["Active in last 24 h", String(health.activeToday)],
+              ["Online now", String(health.onlineNow)],
+              ["Phones with notifications", String(health.pushDevices)],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-2xl bg-[var(--field)] px-3 py-2.5">
+                <dt className="text-xs text-[var(--ink-2)]">{label}</dt>
+                <dd className="mt-0.5 text-lg font-semibold tabular-nums">{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="text-xs text-[var(--ink-3)]">
+            Database running time (Neon&rsquo;s monthly compute allowance) isn&rsquo;t visible from
+            here; check it in the Neon console. The app slows its checks when people are idle to
+            keep it low.
+          </p>
+        </div>
+      </Section>
 
       <Section
         title="Security"

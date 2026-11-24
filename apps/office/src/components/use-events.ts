@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { usePolling } from "@/components/app-provider";
+import { backoff } from "@/lib/activity";
 import type { EventItem, Rsvp } from "@/lib/types";
 
 export function useEvents(intervalMs = 15_000) {
@@ -12,7 +13,7 @@ export function useEvents(intervalMs = 15_000) {
     if (response.ok) setEvents(((await response.json()) as { events: EventItem[] }).events);
   }, []);
 
-  usePolling(reload, intervalMs);
+  usePolling(reload, () => backoff(intervalMs));
 
   /** Optimistically records the user's answer, then confirms with the server. */
   const respond = useCallback(

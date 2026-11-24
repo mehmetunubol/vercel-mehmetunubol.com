@@ -70,6 +70,10 @@ disguised as **Day Planner** (see "Getting in").
   of the window, whatever username it tries. The admin gets an alert naming the
   address, with "Unblock". (People on one office network share an address,
   which is why the limit is generous. `SIGNIN_IP_LIMIT` overrides it.)
+- **Health** (Admin → Health): database size against the free plan's 0.5 GB,
+  the largest tables, stored photos and clips, and counts of messages,
+  upcoming events, people, active in the last 24 h, online now and phones with
+  notifications. Counts only, never content.
 - **Security alerts**: when any account is locked after 5 wrong passwords, the
   admin gets a banner, an Admin-tab badge, a nudge (below) and an entry under
   Admin → Security, with "Unlock now".
@@ -96,7 +100,7 @@ disguised as **Day Planner** (see "Getting in").
 To anyone who isn't signed in, the app is **"Day Planner"**: that's its
 installed name, its checklist icon, the browser tab title and the name shown on
 notifications. Every address (including `/login`) shows a small, working
-to-do list. Its items are kept only in that browser and never sent to the
+planner: Today (a to-do list), Week, Notes and Settings. Its items are kept only in that browser and never sent to the
 server. To sign in, **tap the date at the top three times quickly**. Taps more
 than 0.8 s apart start the count again.
 
@@ -186,6 +190,11 @@ access, but not against a malicious server operator. Nobody else can read
 messages, including through the Neon console.
 
 ## Limits worth knowing
+
+- The app checks for updates every 5 s while you use it (2.5 s in an open
+  chat), slowing to 15 s after 2 idle minutes and 30 s after 5. Touching the
+  screen speeds it up again at once. Checks stop entirely while the app is in
+  the background. This keeps database work low on the free plan.
 
 - Updates arrive by polling (every 2.5 s in an open chat, 5 s on the home
   screen), and polling pauses while the app is in the background. There are no

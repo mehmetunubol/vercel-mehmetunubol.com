@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { backoff, onWake } from "@/lib/activity";
 import type { Identity } from "@/lib/crypto";
 import { loadIdentity } from "@/lib/keystore";
 import type { AppState, ChatSummary, Person } from "@/lib/types";
@@ -32,15 +33,22 @@ export function useApp() {
   return value;
 }
 
-/** Polls while the page is visible; pauses when hidden. */
-export function usePolling(fn: () => void | Promise<void>, intervalMs: number) {
+/**
+ * Polls while the page is visible; pauses when hidden. `interval` may be a
+ * function, re-evaluated before each wait, so callers can slow down when idle.
+ * Coming back after being idle triggers an immediate check.
+ */
+export function usePolling(fn: () => void | Promise<void>, interval: number | (() => number)) {
   const ref = useRef(fn);
+  const delay = useRef(interval);
   useEffect(() => {
     ref.current = fn;
+    delay.current = interval;
   });
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let stopped = false;
+    const next = () => (typeof delay.current === "function" ? delay.current() : delay.current);
     const tick = async () => {
       if (stopped) return;
       if (document.visibilityState === "visible") {
@@ -50,22 +58,24 @@ export function usePolling(fn: () => void | Promise<void>, intervalMs: number) {
           // transient network error; try again next tick
         }
       }
-      timer = setTimeout(tick, intervalMs);
+      if (!stopped) timer = setTimeout(tick, next());
     };
-    const onVisible = () => {
+    const now = () => {
       if (document.visibilityState === "visible") {
         clearTimeout(timer);
         void tick();
       }
     };
     void tick();
-    document.addEventListener("visibilitychange", onVisible);
+    document.addEventListener("visibilitychange", now);
+    const stopWake = onWake(now);
     return () => {
       stopped = true;
       clearTimeout(timer);
-      document.removeEventListener("visibilitychange", onVisible);
+      document.removeEventListener("visibilitychange", now);
+      stopWake();
     };
-  }, [intervalMs]);
+  }, []);
 }
 
 export function AppProvider({ userId, children }: { userId: string; children: React.ReactNode }) {
@@ -81,7 +91,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
     if (response.ok) setState((await response.json()) as AppState);
   }, []);
 
-  usePolling(refresh, 5000);
+  usePolling(refresh, () => backoff(5000));
 
   // Tell the server right away when the app goes to the background or closes,
   // so others see "Last seen …" within seconds instead of after the 30 s window.

@@ -24,7 +24,7 @@ test("presence: in/out lists and scheduled status changes", async ({ browser }) 
   ok(true, 'admin scheduled "back in 2 h"');
 
   await ayse.waitForSelector("text=/is out · back (in 2 h|tomorrow at \\d\\d:\\d\\d)/", {
-    timeout: 10000,
+    timeout: 20_000,
   });
   ok(true, "others see plan in the pinned status bar");
   const t = await text(ayse);
@@ -97,7 +97,7 @@ test("presence: in/out lists and scheduled status changes", async ({ browser }) 
   await ayse.click('button:has-text("Save")');
   await ayse.waitForSelector("text=Leaving tomorrow at 23:30");
   ok(true, 'ayse scheduled "leaving tomorrow at 23:30"');
-  await admin.waitForSelector("text=Leaving tomorrow at 23:30", { timeout: 10000 });
+  await admin.waitForSelector("text=Leaving tomorrow at 23:30", { timeout: 20_000 });
   ok(true, "admin sees ayse under In with leave time");
   await ayse.waitForTimeout(400);
 
@@ -138,7 +138,7 @@ test("presence: in/out lists and scheduled status changes", async ({ browser }) 
   await ayse.waitForSelector("text=Your status");
   await ayse.click('a[href^="/c/"]:has-text("Mehmet Ünübol")');
   await ayse.waitForSelector("text=/In the office · leaving (in 1 h|tomorrow at \\d\\d:\\d\\d)/", {
-    timeout: 10000,
+    timeout: 20_000,
   });
   ok(true, "chat header shows plan");
 });

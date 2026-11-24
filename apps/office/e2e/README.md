@@ -1,22 +1,23 @@
 # Browser tests
 
-Ten Playwright suites that drive the real app in a browser, the way people use
+Eleven Playwright suites that drive the real app in a browser, the way people use
 it: the sign-in gate, chats and encryption, presence, events, security and
 push notifications, photos, online status, and safety controls. They run in order, because later suites use the people and
 chats created by earlier ones.
 
-| Suite         | Covers                                                                                                                                                                                                 |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `01-core`     | Decoy page and triple-tap, adding people and groups, private and group chats (decrypted on each side), session ends when the window closes, unlocking on a new device, password change and admin reset |
-| `02-presence` | In / Out lists, scheduled changes ("back in 2 h", a day + morning), the automatic flip                                                                                                                 |
-| `03-chat`     | Announcement groups, reactions, read receipts, the locked-device rule, replies, edits and deletes                                                                                                      |
-| `04-events`   | Creating, inviting, answers, the calendar, privacy, editing, cancelling                                                                                                                                |
-| `05-security` | Lockout alerts, Unlock now, both panic buttons, Delete all events, the activity log                                                                                                                    |
-| `06-push`     | Who gets a nudge, the one-per-minute limit, that the push carries nothing, what the phone shows                                                                                                        |
-| `07-photos`   | One-time photos (view once, the sender can't open them, erased after everyone has seen them, the viewer closes when you leave the app), ordinary photos and the admin switch                           |
-| `08-online`   | Online / last seen, the reciprocal hide switch, typing, no notifications while you're in the app                                                                                                       |
-| `09-controls` | The per-address guessing limit and Unblock, quick hide (button and Esc twice), auto-lock, per-chat message lifetime, mute                                                                              |
-| `10-clips`    | One-time voice notes and videos recorded with a fake camera/microphone; one-time photos allow 5 seconds                                                                                                |
+| Suite               | Covers                                                                                                                                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `01-core`           | Decoy page and triple-tap, adding people and groups, private and group chats (decrypted on each side), session ends when the window closes, unlocking on a new device, password change and admin reset |
+| `02-presence`       | In / Out lists, scheduled changes ("back in 2 h", a day + morning), the automatic flip                                                                                                                 |
+| `03-chat`           | Announcement groups, reactions, read receipts, the locked-device rule, replies, edits and deletes                                                                                                      |
+| `04-events`         | Creating, inviting, answers, the calendar, privacy, editing, cancelling                                                                                                                                |
+| `05-security`       | Lockout alerts, Unlock now, both panic buttons, Delete all events, the activity log                                                                                                                    |
+| `06-push`           | Who gets a nudge, the one-per-minute limit, that the push carries nothing, what the phone shows                                                                                                        |
+| `07-photos`         | One-time photos (view once, the sender can't open them, erased after everyone has seen them, the viewer closes when you leave the app), ordinary photos and the admin switch                           |
+| `08-online`         | Online / last seen, the reciprocal hide switch, typing, no notifications while you're in the app                                                                                                       |
+| `09-controls`       | The per-address guessing limit and Unblock, quick hide (button and Esc twice), auto-lock, per-chat message lifetime, mute                                                                              |
+| `10-clips`          | One-time voice notes and videos recorded with a fake camera/microphone; one-time photos allow 5 seconds                                                                                                |
+| `11-planner-health` | The Day Planner's Week / Notes / Settings pages (device-only), the admin Health panel                                                                                                                  |
 
 ## Running them
 

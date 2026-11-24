@@ -67,20 +67,20 @@ test("chat: announcements, reactions, read receipts", async ({ browser }) => {
       /\n2\n/.test(document.body.innerText) ||
       document.querySelector('[title="Ayşe Demir, Burak Kaya"]'),
     null,
-    { timeout: 10000 },
+    { timeout: 20_000 },
   );
   ok(
     (await admin.locator('[title="Ayşe Demir, Burak Kaya"]').count()) === 1,
     "admin sees 👍 2 with names",
   );
   await ayse.click('button[aria-label="Thumbs down"]');
-  await admin.waitForSelector('[title="Burak Kaya"]', { timeout: 10000 });
-  await admin.waitForSelector('[title="Ayşe Demir"]', { timeout: 10000 });
+  await admin.waitForSelector('[title="Burak Kaya"]', { timeout: 20_000 });
+  await admin.waitForSelector('[title="Ayşe Demir"]', { timeout: 20_000 });
   ok(true, "switching reaction to 👎 updates counts");
   await ayse.waitForTimeout(300);
   await ayse.click('button[aria-label="Thumbs down"]');
   await admin.waitForFunction(() => !document.querySelector('[title="Ayşe Demir"]'), null, {
-    timeout: 10000,
+    timeout: 20_000,
   });
   ok(true, "tapping the same reaction again removes it");
   const own = await admin.evaluate(async (id) => {
@@ -105,7 +105,7 @@ test("chat: announcements, reactions, read receipts", async ({ browser }) => {
   ok(true, 'direct: "Sent" before the other person opens it');
   await ayse.click('a:has-text("Mehmet Ünübol")');
   await ayse.waitForSelector("text=Did you get the keys?");
-  await admin.waitForSelector("text=Read", { timeout: 10000 });
+  await admin.waitForSelector("text=Read", { timeout: 20_000 });
   ok(true, 'direct: turns to "Read" once opened');
 
   // Read receipts — group.
@@ -115,7 +115,7 @@ test("chat: announcements, reactions, read receipts", async ({ browser }) => {
   await ayse.goto(BASE + "/");
   await ayse.click('a:has-text("Studio")');
   await ayse.waitForSelector("text=Standup in 10 minutes");
-  await admin.waitForSelector("text=Read by 1 of 2", { timeout: 10000 });
+  await admin.waitForSelector("text=Read by 1 of 2", { timeout: 20_000 });
   ok(true, 'group: "Read by 1 of 2"');
   await admin.click('[role=button]:has-text("Standup in 10 minutes")');
   await admin.waitForSelector("text=Not yet");
@@ -127,7 +127,7 @@ test("chat: announcements, reactions, read receipts", async ({ browser }) => {
   await burak.goto(BASE + "/");
   await burak.click('a:has-text("Studio")');
   await burak.waitForSelector("text=Standup in 10 minutes");
-  await admin.waitForSelector("text=Read by all", { timeout: 10000 });
+  await admin.waitForSelector("text=Read by all", { timeout: 20_000 });
   ok(true, 'group: "Read by all"');
 
   await ayse.goto(BASE + "/");
@@ -157,7 +157,7 @@ test("chat: announcements, reactions, read receipts", async ({ browser }) => {
   await admin.waitForFunction(
     () => /Read by 1 of 2/.test(document.body.innerText.split("Locked device test")[1] ?? ""),
     null,
-    { timeout: 10000 },
+    { timeout: 20_000 },
   );
   ok(true, "unlocking marks them as read");
 

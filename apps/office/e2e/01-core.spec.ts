@@ -102,12 +102,12 @@ test("core: gate, people, chats, sessions and passwords", async ({ browser }) =>
   await admin.page.goto(BASE + "/");
   await admin.page.click('.presence-switch button:has-text("In")');
   await admin.page.waitForSelector("text=In the office");
-  await ayse.page.waitForSelector("text=is in the office", { timeout: 10000 });
+  await ayse.page.waitForSelector("text=is in the office", { timeout: 20_000 });
   ok(true, "ayse sees admin's presence (in) via status bar");
 
   // non-admin can't access admin
   await burak.page.goto(BASE + "/admin");
-  await burak.page.waitForURL(BASE + "/", { timeout: 10000 });
+  await burak.page.waitForURL(BASE + "/", { timeout: 20_000 });
   ok(
     !(await burak.page.content()).includes("People &amp; groups"),
     "non-admin redirected away from /admin",
@@ -137,15 +137,15 @@ test("core: gate, people, chats, sessions and passwords", async ({ browser }) =>
 
   // admin sees unread & reads it
   await admin.page.goto(BASE + "/");
-  await admin.page.waitForSelector('a[href^="/c/"]:has-text("Ayşe Demir")', { timeout: 10000 });
+  await admin.page.waitForSelector('a[href^="/c/"]:has-text("Ayşe Demir")', { timeout: 20_000 });
   await admin.page.goto(directUrl);
   await admin.page.waitForSelector("text=Merhaba! Are you at the office today?", {
-    timeout: 10000,
+    timeout: 20_000,
   });
   ok(true, "admin decrypted direct message");
   await admin.page.locator("textarea").fill("Yes, until 6. Come by!");
   await admin.page.click("button[aria-label=Send]");
-  await ayse.page.waitForSelector("text=Yes, until 6. Come by!", { timeout: 10000 });
+  await ayse.page.waitForSelector("text=Yes, until 6. Come by!", { timeout: 20_000 });
   ok(true, "ayse received reply via polling");
 
   // burak cannot read the ayse<->admin chat
@@ -164,7 +164,7 @@ test("core: gate, people, chats, sessions and passwords", async ({ browser }) =>
   await burak.page.waitForFunction(() => !document.body.innerText.includes("Sending…"));
   await ayse.page.goto(BASE + "/");
   await ayse.page.click('a:has-text("Studio")');
-  await ayse.page.waitForSelector("text=Group hello from Burak", { timeout: 10000 });
+  await ayse.page.waitForSelector("text=Group hello from Burak", { timeout: 20_000 });
   ok(true, "group message decrypted by another member");
 
   // Closing and reopening: a fresh window with the old cookies but no tab session is signed out.

@@ -1,9 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Check, Plus, X } from "lucide-react";
+import { CalendarDays, Check, ListTodo, Plus, Settings, StickyNote, X } from "lucide-react";
 import { cn } from "@repo/ui";
 import { LoginForm } from "@/components/login-form";
+import { NotesPage } from "@/components/planner/notes-page";
+import { SettingsPage } from "@/components/planner/settings-page";
+import { WeekPage } from "@/components/planner/week-page";
+
+type PlannerTab = "today" | "week" | "notes" | "settings";
+
+const TABS: { id: PlannerTab; label: string; icon: typeof ListTodo }[] = [
+  { id: "today", label: "Today", icon: ListTodo },
+  { id: "week", label: "Week", icon: CalendarDays },
+  { id: "notes", label: "Notes", icon: StickyNote },
+  { id: "settings", label: "Settings", icon: Settings },
+];
 
 const TAPS_TO_OPEN = 3;
 const MAX_GAP_MS = 800;
@@ -75,6 +87,7 @@ function useToday() {
 
 export function Gate() {
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<PlannerTab>("today");
   const taps = useRef<{ count: number; last: number }>({ count: 0, last: 0 });
   const [tasks, setTasks] = useState<Task[] | null>(null);
   const [draft, setDraft] = useState("");
@@ -116,103 +129,135 @@ export function Gate() {
   const done = list.filter((t) => t.done).length;
 
   return (
-    <main className="safe-top safe-bottom mx-auto flex min-h-dvh w-full max-w-xl flex-col px-5 pt-10 pb-8">
-      {/* The secret: three quick taps on the date open sign-in. Looks like a plain heading. */}
-      <p className="eyebrow">{today?.weekday ?? " "}</p>
-      <h1
-        onClick={onSecretTap}
-        className="mt-1 cursor-default text-[2rem] leading-tight font-semibold select-none"
-      >
-        {today?.date ?? " "}
-      </h1>
-      <p className="mt-1 text-[15px] text-[var(--ink-2)] tabular-nums">
-        {tasks ? (list.length ? `${done} of ${list.length} done` : "Nothing planned yet") : " "}
-      </p>
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const text = draft.trim();
-          if (!text) return;
-          update([...list, { id: `${Date.now()}`, text: text.slice(0, 120), done: false }]);
-          setDraft("");
-        }}
-        className="glass-strong mt-6 flex items-center gap-2 rounded-full p-1.5 pl-4"
-      >
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="Add a task"
-          aria-label="Add a task"
-          className="min-w-0 flex-1 bg-transparent py-2 text-base outline-none placeholder:text-[var(--ink-3)]"
-        />
-        <button
-          type="submit"
-          aria-label="Add"
-          disabled={!draft.trim()}
-          className="btn btn-primary size-10 shrink-0 p-0"
-        >
-          <Plus size={20} />
-        </button>
-      </form>
-
-      <section className="glass mt-4 rounded-[1.75rem] p-2" aria-label="Today's list">
-        <h2 className="eyebrow px-3 pt-3 pb-2">Today&rsquo;s list</h2>
-        {tasks && list.length === 0 ? (
-          <p className="px-3 pb-3 text-sm text-[var(--ink-2)]">
-            Add something you&rsquo;d like to get done today.
+    <main className="safe-top mx-auto flex min-h-dvh w-full max-w-xl flex-col px-5 pt-10 pb-32">
+      {tab === "today" ? (
+        <>
+          {/* The secret: three quick taps on the date open sign-in. Looks like a plain heading. */}
+          <p className="eyebrow">{today?.weekday ?? " "}</p>
+          <h1
+            onClick={onSecretTap}
+            className="mt-1 cursor-default text-[2rem] leading-tight font-semibold select-none"
+          >
+            {today?.date ?? " "}
+          </h1>
+          <p className="mt-1 text-[15px] text-[var(--ink-2)] tabular-nums">
+            {tasks ? (list.length ? `${done} of ${list.length} done` : "Nothing planned yet") : " "}
           </p>
-        ) : null}
-        <ul>
-          {list.map((task) => (
-            <li key={task.id} className="row flex items-center gap-3 px-3 py-2.5">
-              <button
-                type="button"
-                role="checkbox"
-                aria-checked={task.done}
-                aria-label={task.text}
-                onClick={() =>
-                  update(list.map((t) => (t.id === task.id ? { ...t, done: !t.done } : t)))
-                }
-                className={cn(
-                  "grid size-6 shrink-0 place-items-center rounded-full border transition-colors",
-                  task.done
-                    ? "border-transparent bg-[var(--mine)] text-[var(--mine-ink)]"
-                    : "border-[var(--ink-3)]",
-                )}
-              >
-                {task.done ? <Check size={14} strokeWidth={3} /> : null}
-              </button>
-              <span
-                className={cn(
-                  "min-w-0 flex-1 truncate",
-                  task.done && "text-[var(--ink-3)] line-through",
-                )}
-              >
-                {task.text}
-              </span>
-              <button
-                type="button"
-                aria-label={`Remove ${task.text}`}
-                onClick={() => update(list.filter((t) => t.id !== task.id))}
-                className="grid size-8 shrink-0 place-items-center rounded-full text-[var(--ink-3)] hover:bg-[var(--hairline)]"
-              >
-                <X size={15} />
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
 
-      {done > 0 ? (
-        <button
-          type="button"
-          onClick={() => update(list.filter((t) => !t.done))}
-          className="btn btn-quiet btn-sm mt-4 self-start"
-        >
-          Clear completed
-        </button>
-      ) : null}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const text = draft.trim();
+              if (!text) return;
+              update([...list, { id: `${Date.now()}`, text: text.slice(0, 120), done: false }]);
+              setDraft("");
+            }}
+            className="glass-strong mt-6 flex items-center gap-2 rounded-full p-1.5 pl-4"
+          >
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="Add a task"
+              aria-label="Add a task"
+              className="min-w-0 flex-1 bg-transparent py-2 text-base outline-none placeholder:text-[var(--ink-3)]"
+            />
+            <button
+              type="submit"
+              aria-label="Add"
+              disabled={!draft.trim()}
+              className="btn btn-primary size-10 shrink-0 p-0"
+            >
+              <Plus size={20} />
+            </button>
+          </form>
+
+          <section className="glass mt-4 rounded-[1.75rem] p-2" aria-label="Today's list">
+            <h2 className="eyebrow px-3 pt-3 pb-2">Today&rsquo;s list</h2>
+            {tasks && list.length === 0 ? (
+              <p className="px-3 pb-3 text-sm text-[var(--ink-2)]">
+                Add something you&rsquo;d like to get done today.
+              </p>
+            ) : null}
+            <ul>
+              {list.map((task) => (
+                <li key={task.id} className="row flex items-center gap-3 px-3 py-2.5">
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={task.done}
+                    aria-label={task.text}
+                    onClick={() =>
+                      update(list.map((t) => (t.id === task.id ? { ...t, done: !t.done } : t)))
+                    }
+                    className={cn(
+                      "grid size-6 shrink-0 place-items-center rounded-full border transition-colors",
+                      task.done
+                        ? "border-transparent bg-[var(--mine)] text-[var(--mine-ink)]"
+                        : "border-[var(--ink-3)]",
+                    )}
+                  >
+                    {task.done ? <Check size={14} strokeWidth={3} /> : null}
+                  </button>
+                  <span
+                    className={cn(
+                      "min-w-0 flex-1 truncate",
+                      task.done && "text-[var(--ink-3)] line-through",
+                    )}
+                  >
+                    {task.text}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${task.text}`}
+                    onClick={() => update(list.filter((t) => t.id !== task.id))}
+                    className="grid size-8 shrink-0 place-items-center rounded-full text-[var(--ink-3)] hover:bg-[var(--hairline)]"
+                  >
+                    <X size={15} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          {done > 0 ? (
+            <button
+              type="button"
+              onClick={() => update(list.filter((t) => !t.done))}
+              className="btn btn-quiet btn-sm mt-4 self-start"
+            >
+              Clear completed
+            </button>
+          ) : null}
+        </>
+      ) : tab === "week" ? (
+        <WeekPage />
+      ) : tab === "notes" ? (
+        <NotesPage />
+      ) : (
+        <SettingsPage />
+      )}
+
+      <nav className="safe-bottom pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4">
+        <div className="glass-strong pointer-events-auto flex gap-1 rounded-full p-1.5">
+          {TABS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              aria-current={tab === id ? "page" : undefined}
+              className={cn(
+                "flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition-colors",
+                tab === id
+                  ? "bg-[var(--mine)] text-[var(--mine-ink)]"
+                  : "text-[var(--ink-2)] hover:text-[var(--ink)]",
+              )}
+            >
+              <Icon size={18} strokeWidth={2} />
+              <span className={tab === id ? "" : "sr-only sm:not-sr-only"}>{label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
     </main>
   );
 }

@@ -80,9 +80,11 @@ test("controls: guessing limit, hide, auto-lock, chat lifetime, mute", async ({ 
     .getByRole("button", { name: "1 min", exact: true })
     .click();
   await expect(
-    idle.getByRole("group", { name: "Auto-lock after" }).getByRole("button", { name: "1 min", exact: true }),
+    idle
+      .getByRole("group", { name: "Auto-lock after" })
+      .getByRole("button", { name: "1 min", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-// Reload so the app starts with the 1-minute setting, then let it settle
+  // Reload so the app starts with the 1-minute setting, then let it settle
   // before fast-forwarding the clock.
   await idle.reload();
   await idle.waitForResponse((r) => r.url().includes("/api/state") && r.ok());
@@ -99,7 +101,9 @@ test("controls: guessing limit, hide, auto-lock, chat lifetime, mute", async ({ 
     .getByRole("button", { name: "5 min", exact: true })
     .click();
   await expect(
-    reset.getByRole("group", { name: "Auto-lock after" }).getByRole("button", { name: "5 min", exact: true }),
+    reset
+      .getByRole("group", { name: "Auto-lock after" })
+      .getByRole("button", { name: "5 min", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await reset.context().close();
 

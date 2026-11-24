@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { cn } from "@repo/ui";
 import { useApp, usePolling } from "@/components/app-provider";
+import { backoff } from "@/lib/activity";
 import { Avatar } from "@/components/avatar";
 import { UnlockCard } from "@/components/unlock-card";
 import { decryptMessage, encryptMessage, messageAad } from "@/lib/crypto";
@@ -182,7 +183,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
     else if (response.ok) setConversation((await response.json()) as Conversation);
   }, [conversationId]);
 
-  usePolling(loadConversation, 30_000);
+  usePolling(loadConversation, () => backoff(30_000));
 
   // A poll that started before the key was ready finishes with a stale
   // closure; reading the key through a ref means it still decrypts.
@@ -268,6 +269,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
     };
     setPhotos(new Map(data.photos.map((p) => [p.messageId, p])));
     setTyping(data.typing ?? []);
+    if ((data.typing ?? []).length) lastChatActivity.current = Date.now();
     const { messages } = data;
     setReads(data.reads);
     if (version === reactionsVersion.current) setReactions(data.reactions);
@@ -296,12 +298,18 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       if (!cursor.current || m.updatedAt > cursor.current) cursor.current = m.updatedAt;
     }
     if (added.length || changed.length) {
+      lastChatActivity.current = Date.now();
       await decryptInto([...added, ...changed]);
       if (identityRef.current && added.some((m) => m.senderId !== meId)) await markRead();
     }
   }, [conversationId, decryptInto, meId, markRead]);
 
-  usePolling(loadMessages, 2500);
+  // Fast while the chat is busy (a message arrived or someone typed in the last
+  // 30 s); otherwise it follows the usual idle slow-down.
+  const lastChatActivity = useRef(0);
+  usePolling(loadMessages, () =>
+    Date.now() - lastChatActivity.current < 30_000 ? 2500 : backoff(2500),
+  );
 
   // Once the key unlocks, decrypt anything already fetched.
   // Messages fetched while locked count as read once they're unlocked.
