@@ -36,8 +36,14 @@ export async function tapSecret(page: Page) {
 }
 
 /** A fresh "phone" with the decoy page open and sign-in revealed. */
-export async function openGate(browser: Browser, scheme: "light" | "dark" = "dark") {
+export async function openGate(
+  browser: Browser,
+  scheme: "light" | "dark" = "dark",
+  extraHTTPHeaders?: Record<string, string>,
+) {
   const context = await browser.newContext({
+    permissions: ["camera", "microphone"],
+    ...(extraHTTPHeaders ? { extraHTTPHeaders } : {}),
     ...devices["iPhone 13"],
     colorScheme: scheme,
     timezoneId: "Europe/Istanbul",
@@ -185,3 +191,9 @@ export async function closeAllWindows(browser: Browser) {
 export async function resetOnline() {
   await sql("update users set online_until = null");
 }
+
+/** A small valid PNG for photo tests (the app re-encodes it as JPEG). */
+export const TEST_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAABAAAAAMCAIAAADkharWAAABVUlEQVR4nA3LIQHFIBRAUSJMEACJXADEIrwICAIgkTcAgggvwgQBkEgCIBaBCP8ff4wxXAZnuA2PQQzRkA0YmkENr2EYluEzHIMxlsviLLflsYglWrIFS7Oo5bUMy7J8lmP/wXN5nOf2PB7xRE/24Gke9bye4Vmez3P8PwSugAvcgScggRjIAQItoIE3MAIr8AVO+AfhEpxwC48gQhSygNAEFV5hCEv4hCP/kLgSLnEnnoQkYiInSLSEJt7ESKzElzjpHwpXwRXuwlOQQizkAoVW0MJbGIVV+Aqn/EPlqrjKXXkqUomVXKHSKlp5K6OyKl/l1H9QLsUpt/IookQlKyhNUeVVhrKUTzn6D52r4zp35+lIJ3Zyh07raOftjM7qfJ3T/2FyTdzknjwTmcRJnjBpE528kzFZk29y5j9sro3b3JtnI5u4yRs2baObdzM2a/NtzuYHM20MkJBAK/YAAAAASUVORK5CYII=",
+  "base64",
+);

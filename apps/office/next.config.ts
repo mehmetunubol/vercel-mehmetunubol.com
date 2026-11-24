@@ -7,7 +7,8 @@ const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), browsing-topics=()",
+    // Camera and microphone: only this app, for 5-second voice notes and videos.
+    value: "camera=(self), microphone=(self), geolocation=(), browsing-topics=()",
   },
 ];
 

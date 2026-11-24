@@ -11,6 +11,7 @@ import { getCurrentUser } from "@/lib/session";
 import { markAllAlertsSeen } from "@/lib/security";
 import { setLoginsDisabled, setMessageTtlHours, setPhotosAllowed } from "@/lib/settings";
 import { logAdmin } from "@/lib/admin-log";
+import { unblockIp } from "@/lib/guessing";
 import { events } from "@/lib/db/schema";
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; message: string };
@@ -307,4 +308,17 @@ export async function savePhotoSettings(
     allowed ? "Allowed ordinary photos" : "Turned off ordinary photos",
   );
   return done(allowed ? "Ordinary photos are allowed." : "Only one-time photos can be sent now.");
+}
+
+/** Lets a blocked network address try signing in again right away. */
+export async function unblockAddress(
+  _: ActionResult | null,
+  form: FormData,
+): Promise<ActionResult> {
+  await requireAdmin();
+  const ip = String(form.get("ip") ?? "").slice(0, 64);
+  if (!ip) return { ok: false, message: "Unknown address." };
+  await unblockIp(ip);
+  await logAdmin("security.unblocked", `Unblocked sign-ins from ${ip}`);
+  return done("Unblocked.");
 }

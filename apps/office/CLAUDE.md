@@ -48,3 +48,11 @@ setup and the encryption design.
   follows the same rule. Push skips people who are online.
 - Browser tests share one browser: every suite closes its windows afterwards
   (`closeAllWindows`), or open windows keep their users "online".
+- CI: `.github/workflows/office.yml` runs typecheck, lint, unit and browser
+  tests on every push/PR touching the app. Keep it green; if a suite becomes
+  slow or flaky, fix the cause rather than skipping it.
+- Sign-in guessing limit (`lib/guessing.ts`) trusts `x-real-ip` /
+  `x-forwarded-for`, which Vercel sets itself. Browser tests fake an address
+  with that header; use made-up usernames there so real accounts don't lock.
+- One-time clips (voice/video) share the photo pipeline (`MediaType` in
+  `lib/photo.ts`); they are always "once" and at most `MAX_CLIP_SECONDS`.

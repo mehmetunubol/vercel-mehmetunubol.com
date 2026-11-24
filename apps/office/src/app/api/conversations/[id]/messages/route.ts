@@ -185,7 +185,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const keys = Object.fromEntries(Object.entries(body.keys).filter(([uid]) => memberIds.has(uid)));
   if (!keys[me.id]) return badRequest("missing sender key");
 
-  const ttlHours = await getMessageTtlHours();
+  // This chat's own lifetime, if set; otherwise the global one.
+  const ttlHours = conversation.ttlHours ?? (await getMessageTtlHours());
   const [row] = await db
     .insert(messages)
     .values({
@@ -222,6 +223,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .update(conversationMembers)
     .set({ typingAt: null })
     .where(and(eq(conversationMembers.conversationId, id), eq(conversationMembers.userId, me.id)));
-  notifyUsers(conversation.members.map((m) => m.id).filter((uid) => uid !== me.id));
+  // Notify everyone else, except people who muted this chat.
+  const muted = await db
+    .select({ userId: conversationMembers.userId })
+    .from(conversationMembers)
+    .where(
+      and(
+        eq(conversationMembers.conversationId, id),
+        sql`${conversationMembers.mutedUntil} > now()`,
+      ),
+    );
+  const mutedIds = new Set(muted.map((m) => m.userId));
+  notifyUsers(
+    conversation.members.map((m) => m.id).filter((uid) => uid !== me.id && !mutedIds.has(uid)),
+  );
   return Response.json(row);
 }

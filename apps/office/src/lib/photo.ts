@@ -8,10 +8,15 @@ import { fromBase64, toBase64 } from "@/lib/crypto";
  */
 
 export type PhotoKind = "once" | "normal";
+/** What the attachment is. Voice notes and videos are always one-time, up to 5 s. */
+export type MediaType = "photo" | "audio" | "video";
+export const MAX_CLIP_SECONDS = 5;
 
 export interface PhotoPayload {
   type: "photo";
   kind: PhotoKind;
+  media: MediaType;
+  duration: number; // seconds, for audio / video
   key: string; // base64 raw AES key for the image bytes
   mime: string;
   width: number;
@@ -22,7 +27,10 @@ export interface PhotoPayload {
 // Structured message bodies start with this character, which a keyboard can't type.
 const PAYLOAD_PREFIX = "\u0001";
 
-export function encodePhotoPayload(payload: Omit<PhotoPayload, "type">) {
+export function encodePhotoPayload(
+  payload: Omit<PhotoPayload, "type" | "media" | "duration"> &
+    Partial<Pick<PhotoPayload, "media" | "duration">>,
+) {
   return PAYLOAD_PREFIX + JSON.stringify({ type: "photo", ...payload });
 }
 
@@ -40,6 +48,8 @@ export function parseBody(plaintext: string): ParsedBody {
         return {
           type: "photo",
           kind: value.kind,
+          media: value.media === "audio" || value.media === "video" ? value.media : "photo",
+          duration: Number(value.duration) || 0,
           key: value.key,
           mime: typeof value.mime === "string" ? value.mime : "image/jpeg",
           width: Number(value.width) || 0,

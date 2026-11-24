@@ -1,13 +1,10 @@
 import { expect, type Page, test } from "@playwright/test";
-import { BASE, api, closeAllWindows, ok, signIn, sql, waitFor } from "./helpers";
+import { BASE, TEST_PNG, api, closeAllWindows, ok, signIn, sql, waitFor } from "./helpers";
 
 // One-time and ordinary photos. Runs after the earlier suites.
 
 // A small PNG; the app re-encodes it as JPEG (dropping metadata) before encrypting.
-const PNG = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAABAAAAAMCAIAAADkharWAAABVUlEQVR4nA3LIQHFIBRAUSJMEACJXADEIrwICAIgkTcAgggvwgQBkEgCIBaBCP8ff4wxXAZnuA2PQQzRkA0YmkENr2EYluEzHIMxlsviLLflsYglWrIFS7Oo5bUMy7J8lmP/wXN5nOf2PB7xRE/24Gke9bye4Vmez3P8PwSugAvcgScggRjIAQItoIE3MAIr8AVO+AfhEpxwC48gQhSygNAEFV5hCEv4hCP/kLgSLnEnnoQkYiInSLSEJt7ESKzElzjpHwpXwRXuwlOQQizkAoVW0MJbGIVV+Aqn/EPlqrjKXXkqUomVXKHSKlp5K6OyKl/l1H9QLsUpt/IookQlKyhNUeVVhrKUTzn6D52r4zp35+lIJ3Zyh07raOftjM7qfJ3T/2FyTdzknjwTmcRJnjBpE528kzFZk29y5j9sro3b3JtnI5u4yRs2baObdzM2a/NtzuYHM20MkJBAK/YAAAAASUVORK5CYII=",
-  "base64",
-);
+const PNG = TEST_PNG;
 
 async function pickPhoto(page: Page) {
   await page.setInputFiles('input[aria-label="Choose a photo"]', {

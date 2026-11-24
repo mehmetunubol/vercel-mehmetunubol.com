@@ -1,0 +1,83 @@
+# Checks for apps/office on every push and pull request that touches it:
+# type check, lint, unit tests, then all browser suites against a throwaway
+# Postgres. A red run means something broke; open the run for details.
+name: Office checks
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "apps/office/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/office.yml"
+  pull_request:
+    paths:
+      - "apps/office/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/office.yml"
+
+concurrency:
+  group: office-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      # Throwaway database for the browser tests (they wipe it).
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: office
+          POSTGRES_PASSWORD: office
+          POSTGRES_DB: office_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U office"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm --filter office typecheck
+
+      - name: Lint
+        run: pnpm --filter office lint
+
+      - name: Unit tests
+        run: pnpm --filter office test
+
+      - name: Install browser
+        run: pnpm --filter office exec playwright install --with-deps chromium
+
+      - name: Browser tests
+        run: pnpm --filter office e2e
+        env:
+          E2E_DATABASE_URL: postgres://office:office@localhost:5432/office_e2e
+
+      - name: Keep failure details
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: apps/office/test-results
+          retention-days: 7

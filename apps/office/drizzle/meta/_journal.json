@@ -71,6 +71,13 @@
       "when": 1795527607373,
       "tag": "0009_online_status",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795550457751,
+      "tag": "0010_hardening_media_chat_settings",
+      "breakpoints": true
     }
   ]
 }

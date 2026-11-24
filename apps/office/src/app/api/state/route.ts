@@ -43,6 +43,8 @@ export async function GET() {
         kind: conversations.kind,
         name: conversations.name,
         announcement: conversations.announcement,
+        ttlHours: conversations.ttlHours,
+        muted: sql<boolean>`coalesce(${conversationMembers.mutedUntil} > now(), false)`,
         lastMessageAt: sql<string | null>`(
           select max(m.created_at) from ${messages} m
           where m.conversation_id = ${conversations.id} and m.expires_at > now()
@@ -104,6 +106,7 @@ export async function GET() {
       isAdmin: me.isAdmin,
       publicKey: me.publicKey,
       hideOnline: me.hideOnline,
+      autoLockMinutes: me.autoLockMinutes,
     },
     people: visiblePeople.sort((a, b) =>
       a.username === ADMIN_USERNAME ? -1 : b.username === ADMIN_USERNAME ? 1 : 0,

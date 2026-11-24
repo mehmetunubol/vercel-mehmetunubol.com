@@ -10,6 +10,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { deleteOldAdminLog } from "@/lib/admin-log";
+import { IP_FAILURE_LIMIT, IP_WINDOW_MINUTES } from "@/lib/guessing";
 import { getCurrentUser } from "@/lib/session";
 import { applyDuePlans } from "@/lib/presence";
 import { getLoginsDisabled, getMessageTtlHours, getPhotosAllowed } from "@/lib/settings";
@@ -24,6 +25,7 @@ import {
   deleteGroup,
   deleteUser,
   markAlertsSeen,
+  unblockAddress,
   unlockUser,
   renameUser,
   resetPassword,
@@ -154,6 +156,7 @@ export default async function AdminPage() {
         .select({
           id: securityAlerts.id,
           kind: securityAlerts.kind,
+          detail: securityAlerts.detail,
           userId: securityAlerts.userId,
           createdAt: securityAlerts.createdAt,
           seenAt: securityAlerts.seenAt,
@@ -180,7 +183,7 @@ export default async function AdminPage() {
 
       <Section
         title="Security"
-        hint="An alert appears when an account is locked after 5 wrong passwords in a row."
+        hint="Alerts appear when an account is locked after 5 wrong passwords, or a network address is blocked after too many failed sign-ins."
       >
         <div className="px-1 pb-2">
           {alerts.length === 0 ? (
@@ -190,6 +193,7 @@ export default async function AdminPage() {
             {alerts.map((alert) => {
               const person = people.find((p) => p.id === alert.userId);
               const stillLocked = person?.lockedUntil && person.lockedUntil > now;
+              const ipAlert = alert.kind === "ip_blocked";
               return (
                 <li
                   key={alert.id}
@@ -200,19 +204,38 @@ export default async function AdminPage() {
                     className={`mt-0.5 shrink-0 ${alert.seenAt ? "text-[var(--ink-3)]" : "text-[var(--danger)]"}`}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm">
-                      <span className="font-semibold">{person?.displayName ?? "Removed user"}</span>
-                      {person ? (
-                        <span className="text-[var(--ink-2)]"> (@{person.username})</span>
-                      ) : null}
-                      : locked after 5 failed sign-in attempts
-                    </p>
+                    {ipAlert ? (
+                      <p className="text-sm">
+                        Sign-ins from{" "}
+                        <span className="font-semibold tabular-nums">{alert.detail}</span> blocked
+                        for {IP_WINDOW_MINUTES} minutes after {IP_FAILURE_LIMIT} failed attempts
+                      </p>
+                    ) : (
+                      <p className="text-sm">
+                        <span className="font-semibold">
+                          {person?.displayName ?? "Removed user"}
+                        </span>
+                        {person ? (
+                          <span className="text-[var(--ink-2)]"> (@{person.username})</span>
+                        ) : null}
+                        : locked after 5 failed sign-in attempts
+                      </p>
+                    )}
                     <p className="text-xs text-[var(--ink-3)] tabular-nums">
                       <LocalTime iso={alert.createdAt.toISOString()} />
                       {stillLocked ? " · still locked" : ""}
                     </p>
                   </div>
-                  {stillLocked && person ? (
+                  {ipAlert && alert.detail ? (
+                    <ActionForm
+                      action={unblockAddress}
+                      submitLabel="Unblock"
+                      submitClassName="btn-quiet btn-sm"
+                    >
+                      <input type="hidden" name="ip" value={alert.detail} />
+                    </ActionForm>
+                  ) : null}
+                  {!ipAlert && stillLocked && person ? (
                     <ActionForm
                       action={unlockUser}
                       submitLabel="Unlock now"

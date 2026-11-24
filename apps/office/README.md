@@ -35,14 +35,21 @@ disguised as **Day Planner** (see "Getting in").
     location, camera details), and encrypts it with its own key, which travels
     inside the encrypted message. The server only stores the encrypted bytes.
     - _One-time photos_ (always available): each recipient can open one once,
-      viewing it only while holding a finger on it, for 10 seconds in total.
+      viewing it only while holding a finger on it, for 5 seconds in total.
       It's drawn so there's no "Save image" option, and it closes if you leave
       the app. The sender can't reopen it and sees "Opened" / "Opened by N".
       The server erases the photo once every recipient has opened it, or when
       the message expires. Screenshots can't be blocked by any web app (or any
       app on iPhone).
+    - _One-time voice notes and videos_ (up to 5 seconds, recorded in the app):
+      same rules as one-time photos; they play while held and close when they
+      end.
     - _Ordinary photos_ stay in the chat until the message expires. Admin →
       Messages → "Allow ordinary photos" turns them on (off by default).
+  - **Chat details** (tap the chat's name): how long messages last in this
+    chat (default, 1 hour, 8 hours, 1 day, 1 week). Either person can change
+    it in a private chat; only the admin can for groups. **Mute** a chat for 8
+    hours, a week or always: no notifications from it, just for you.
   - **Reactions**: 👍 / 👎 on received messages, one per person per message.
 - **Events**: anyone can plan an event with a title, a date and start time,
   an estimated duration and an optional description (up to 500 characters),
@@ -54,6 +61,15 @@ disguised as **Day Planner** (see "Getting in").
   days after they end.
 - **Admin** (`user` only): add, rename and remove people, reset passwords,
   create groups and change their members, and set the message lifetime.
+- **Quick hide and auto-lock**: the eye button (tab bar and chat header), or
+  Esc twice on a computer, signs out at once and shows the Day Planner.
+  The app also locks itself after 1 / 5 (default) / 15 / 30 idle minutes,
+  chosen under Account. Time in the background counts as idle.
+- **Guessing limit**: after 20 failed sign-ins within 15 minutes from one
+  network address, that address gets the ordinary "locked" message for the rest
+  of the window, whatever username it tries. The admin gets an alert naming the
+  address, with "Unblock". (People on one office network share an address,
+  which is why the limit is generous. `SIGNIN_IP_LIMIT` overrides it.)
 - **Security alerts**: when any account is locked after 5 wrong passwords, the
   admin gets a banner, an Admin-tab badge, a nudge (below) and an entry under
   Admin → Security, with "Unlock now".
@@ -119,6 +135,9 @@ Tailwind v4 · WebCrypto.
 To use a plain local Postgres instead of Neon, set `DATABASE_DRIVER=pg`.
 
 ## Tests
+
+Every push and pull request touching the app runs type checks, lint, unit tests
+and all browser suites on GitHub (`.github/workflows/office.yml`).
 
 - Unit tests: `pnpm --filter office test`
 - Browser tests (needs a local Postgres): see [`e2e/README.md`](e2e/README.md)

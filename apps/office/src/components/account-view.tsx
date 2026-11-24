@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { signIn, signOut } from "next-auth/react";
-import { LockKeyhole, LogOut } from "lucide-react";
+import { LockKeyhole, LogOut, Timer } from "lucide-react";
 import { useApp } from "@/components/app-provider";
 import { Avatar } from "@/components/avatar";
 import { NotificationsCard } from "@/components/notifications-card";
@@ -10,6 +10,7 @@ import { rewrapPrivateKey } from "@/lib/crypto";
 import { clearIdentities } from "@/lib/keystore";
 import { clearSessionLive } from "@/lib/live-session";
 import { MIN_PASSWORD_LENGTH } from "@/lib/constants";
+import { AUTO_LOCK_CHOICES } from "@/lib/hide";
 
 export function AccountView() {
   const { state } = useApp();
@@ -136,6 +137,8 @@ export function AccountView() {
 
       <NotificationsCard />
 
+      <AutoLockCard />
+
       <section
         className="glass rise space-y-3 rounded-[1.75rem] p-5"
         style={{ animationDelay: "120ms" }}
@@ -198,5 +201,52 @@ function OnlineStatusToggle() {
         </span>
       </span>
     </label>
+  );
+}
+
+/** How long the app may sit untouched before it locks back to the Day Planner. */
+function AutoLockCard() {
+  const { state, refresh } = useApp();
+  const [pending, setPending] = useState<number | null>(null);
+  if (!state) return null;
+  const current = pending ?? state.me.autoLockMinutes;
+
+  async function choose(minutes: number) {
+    setPending(minutes);
+    await fetch("/api/me/settings", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ autoLockMinutes: minutes }),
+    }).catch(() => {});
+    await refresh();
+    setPending(null);
+  }
+
+  return (
+    <section
+      className="glass rise space-y-3 rounded-[1.75rem] p-5"
+      style={{ animationDelay: "100ms" }}
+    >
+      <h2 className="eyebrow flex items-center gap-1.5">
+        <Timer size={12} /> Auto-lock
+      </h2>
+      <p className="text-sm text-[var(--ink-2)]">
+        If you don&rsquo;t touch the app for this long, it locks and shows the planner again. Time
+        with the app in the background counts too. To hide it at once, use the eye button.
+      </p>
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Auto-lock after">
+        {AUTO_LOCK_CHOICES.map((minutes) => (
+          <button
+            key={minutes}
+            type="button"
+            className="chip"
+            aria-pressed={current === minutes}
+            onClick={() => void choose(minutes)}
+          >
+            {minutes} min
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }

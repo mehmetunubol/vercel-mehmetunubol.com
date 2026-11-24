@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, House, SlidersHorizontal, UserRound } from "lucide-react";
+import { CalendarDays, EyeOff, House, SlidersHorizontal, UserRound } from "lucide-react";
 import { cn } from "@repo/ui";
 import { useApp } from "@/components/app-provider";
+import { hideNow } from "@/lib/hide";
 
 export function TabBar({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
@@ -61,6 +62,15 @@ export function TabBar({ isAdmin }: { isAdmin: boolean }) {
             </Link>
           );
         })}
+        <button
+          type="button"
+          onClick={hideNow}
+          aria-label="Hide now"
+          title="Hide now"
+          className="flex items-center rounded-full px-3.5 py-2.5 text-[var(--ink-2)] transition-colors hover:text-[var(--ink)]"
+        >
+          <EyeOff size={18} strokeWidth={2} />
+        </button>
       </div>
     </nav>
   );

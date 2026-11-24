@@ -14,6 +14,8 @@ describe("photo payloads", () => {
     expect(parseBody(body)).toEqual({
       type: "photo",
       kind: "once",
+      media: "photo",
+      duration: 0,
       key: "k",
       mime: "image/jpeg",
       width: 10,
@@ -21,6 +23,17 @@ describe("photo payloads", () => {
       caption: "hi",
     });
     expect(parseBody("just text")).toEqual({ type: "text", text: "just text" });
+    const clip = encodePhotoPayload({
+      kind: "once",
+      key: "k",
+      mime: "audio/webm",
+      width: 0,
+      height: 0,
+      caption: "",
+      media: "audio",
+      duration: 3.2,
+    });
+    expect(parseBody(clip)).toMatchObject({ media: "audio", duration: 3.2 });
     expect(parseBody('{"type":"photo","kind":"once","key":"k"}').type).toBe("text");
   });
 });

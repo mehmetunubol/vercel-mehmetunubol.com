@@ -4,19 +4,24 @@ import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUp,
+  BellOff,
   Check,
   CheckCheck,
   ChevronLeft,
   Eye,
+  EyeOff,
   ImagePlus,
   LockKeyhole,
   Megaphone,
+  Mic,
   Pencil,
+  Plus,
   Reply,
   ThumbsDown,
   ThumbsUp,
   Trash2,
   Users,
+  Video,
   X,
 } from "lucide-react";
 import { cn } from "@repo/ui";
@@ -28,12 +33,16 @@ import { prepareImage, type PreparedImage } from "@/lib/image";
 import {
   encodePhotoPayload,
   encryptPhoto,
+  type MediaType,
   parseBody,
   type PhotoKind,
   type PhotoPayload,
   photoAad,
 } from "@/lib/photo";
+import { ClipRecorder, type RecordedClip } from "@/components/clip-recorder";
 import { OnceViewer, PhotoLightbox, type PhotoRef, PhotoThumb } from "@/components/photo-views";
+import { ChatDetails } from "@/components/chat-details";
+import { hideNow } from "@/lib/hide";
 import { onlineLabel, timeLabel, ttlLabel } from "@/lib/format";
 import { personPlanLabel, withDuePlan } from "@/lib/plan";
 import { ADMIN_USERNAME, MAX_MESSAGE_CHARS } from "@/lib/constants";
@@ -112,7 +121,14 @@ interface Item {
 /** First line of a message, shortened, for reply quotes. */
 function snippet(body: Body | undefined) {
   if (body?.kind === "photo") {
-    const label = body.photo.kind === "once" ? "One-time photo" : "Photo";
+    const label =
+      body.photo.media === "audio"
+        ? "Voice note"
+        : body.photo.media === "video"
+          ? "One-time video"
+          : body.photo.kind === "once"
+            ? "One-time photo"
+            : "Photo";
     return body.photo.caption ? `${label} · ${body.photo.caption}` : label;
   }
   if (!body || body.kind !== "text") return "Message";
@@ -148,6 +164,12 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   // Who else is typing here, and when we last told the server we are.
   const [typing, setTyping] = useState<string[]>([]);
   const lastTypingPing = useRef(0);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [attachMenu, setAttachMenu] = useState(false);
+  const [recording, setRecording] = useState<"audio" | "video" | null>(null);
+  // This chat's summary (lifetime, mute) from the polled app state.
+  const chatSummary = state?.chats.find((c) => c.id === conversationId);
+  const effectiveTtl = chatSummary?.ttlHours ?? state?.ttlHours ?? 24;
   const wire = useRef<Map<string, WireMessage>>(new Map());
   const cursor = useRef<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -470,19 +492,53 @@ export function ChatView({ conversationId }: { conversationId: string }) {
     }
   }
 
+  function openPhotoPicker() {
+    filePicker.current?.click();
+  }
+
   function dropPhoto() {
     if (pendingPhoto) URL.revokeObjectURL(pendingPhoto.url);
     setPendingPhoto(null);
   }
 
-  /** Encrypts the photo with its own key, and puts that key inside the encrypted message. */
-  async function sendPhoto(caption: string) {
-    if (!pendingPhoto || !identity || !meId || !conversation) return;
+  function sendPhoto(caption: string) {
+    if (!pendingPhoto) return;
     const { image, url, kind } = pendingPhoto;
+    setPendingPhoto(null);
+    return sendAttachment(
+      { ...image, kind, media: "photo", duration: 0, previewUrl: url },
+      caption,
+    );
+  }
+
+  function sendClip(clip: RecordedClip, media: "audio" | "video") {
+    setRecording(null);
+    return sendAttachment({ ...clip, kind: "once", media }, draft.trim());
+  }
+
+  /**
+   * Encrypts a photo or clip with its own key, and puts that key inside the
+   * encrypted message.
+   */
+  async function sendAttachment(
+    input: {
+      bytes: Uint8Array<ArrayBuffer>;
+      mime: string;
+      width: number;
+      height: number;
+      kind: PhotoKind;
+      media: MediaType;
+      duration: number;
+      previewUrl?: string;
+    },
+    caption: string,
+  ) {
+    if (!identity || !meId || !conversation) return;
+    const { kind, media, duration, previewUrl: url } = input;
+    const image = input;
     const id = crypto.randomUUID();
     const replyToId = replyTo;
     setReplyTo(null);
-    setPendingPhoto(null);
     setDraft("");
     stickToBottom.current = true;
     const placeholder: PhotoPayload = {
@@ -493,13 +549,15 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       width: image.width,
       height: image.height,
       caption,
+      media,
+      duration,
     };
     const localUrl = kind === "normal" ? url : undefined;
     const optimistic: Item = {
       id,
       senderId: meId,
       createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + (state?.ttlHours ?? 24) * 3_600_000).toISOString(),
+      expiresAt: new Date(Date.now() + effectiveTtl * 3_600_000).toISOString(),
       body: { kind: "photo", photo: placeholder, localUrl },
       replyToId,
       sending: true,
@@ -514,6 +572,8 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         width: image.width,
         height: image.height,
         caption,
+        media,
+        duration,
       });
       const encrypted = await encryptMessage(
         payload,
@@ -534,7 +594,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       });
       if (!response.ok) {
         const data = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error ?? "Couldn't send the photo.");
+        throw new Error(data.error ?? "Couldn't send it.");
       }
       const saved = (await response.json()) as { createdAt: string; expiresAt: string };
       setItems((prev) =>
@@ -545,10 +605,10 @@ export function ChatView({ conversationId }: { conversationId: string }) {
           sending: false,
         }),
       );
-      if (kind === "once") URL.revokeObjectURL(url);
+      if (kind === "once" && url) URL.revokeObjectURL(url);
     } catch (error) {
       setItems((prev) => new Map(prev).set(id, { ...optimistic, sending: false, error: true }));
-      setNotice(error instanceof Error ? error.message : "Couldn't send the photo.");
+      setNotice(error instanceof Error ? error.message : "Couldn't send it.");
     }
   }
 
@@ -566,7 +626,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       id,
       senderId: meId,
       createdAt: nowIso,
-      expiresAt: new Date(Date.now() + (state?.ttlHours ?? 24) * 3_600_000).toISOString(),
+      expiresAt: new Date(Date.now() + effectiveTtl * 3_600_000).toISOString(),
       body: { kind: "text", text },
       replyToId,
       sending: true,
@@ -631,7 +691,12 @@ export function ChatView({ conversationId }: { conversationId: string }) {
               size={36}
             />
           ) : null}
-          <div className="min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={() => setDetailsOpen(true)}
+            aria-label="Chat details"
+            className="min-w-0 flex-1 text-left"
+          >
             <p className="truncate leading-tight font-semibold">{title || " "}</p>
             <p className="truncate text-xs text-[var(--ink-2)]">
               {conversation?.kind === "direct" && typing.length > 0
@@ -652,7 +717,19 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                         .join(" · ")
                     : ""}
             </p>
-          </div>
+          </button>
+          {chatSummary?.muted ? (
+            <BellOff size={15} className="shrink-0 text-[var(--ink-3)]" aria-label="Muted" />
+          ) : null}
+          <button
+            type="button"
+            onClick={hideNow}
+            aria-label="Hide now"
+            title="Hide now"
+            className="-mr-2 grid size-10 shrink-0 place-items-center rounded-full text-[var(--ink-2)] hover:bg-[var(--hairline)]"
+          >
+            <EyeOff size={18} />
+          </button>
         </div>
       </header>
 
@@ -667,7 +744,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         <div className="mx-auto flex max-w-3xl flex-col gap-1">
           <p className="mx-auto mb-4 flex items-center gap-1.5 rounded-full px-3 py-1 text-center text-xs text-[var(--ink-3)]">
             <LockKeyhole size={12} /> End-to-end encrypted · disappears after{" "}
-            {ttlLabel(state?.ttlHours ?? 24)}
+            {ttlLabel(effectiveTtl)}
           </p>
 
           {identityStatus === "locked" ? <UnlockCard /> : null}
@@ -941,6 +1018,49 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                 {notice}
               </p>
             ) : null}
+            {attachMenu && !editing ? (
+              <div
+                className="glass-strong rise mx-auto mb-1.5 flex max-w-3xl gap-1 rounded-2xl p-1.5"
+                role="menu"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setAttachMenu(false);
+                    openPhotoPicker();
+                  }}
+                  className="flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-xs font-semibold hover:bg-[var(--hairline)]"
+                >
+                  <ImagePlus size={20} />
+                  Photo
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setAttachMenu(false);
+                    setRecording("audio");
+                  }}
+                  className="flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-xs font-semibold hover:bg-[var(--hairline)]"
+                >
+                  <Mic size={20} />
+                  Voice note · 5 s
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setAttachMenu(false);
+                    setRecording("video");
+                  }}
+                  className="flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-xs font-semibold hover:bg-[var(--hairline)]"
+                >
+                  <Video size={20} />
+                  Video · 5 s
+                </button>
+              </div>
+            ) : null}
             {pendingPhoto ? (
               <div className="glass mx-auto mb-1.5 flex max-w-3xl items-center gap-3 rounded-2xl p-2 text-sm">
                 {/* eslint-disable-next-line @next/next/no-img-element -- local preview of your own photo */}
@@ -1034,12 +1154,16 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                   />
                   <button
                     type="button"
-                    aria-label="Add a photo"
+                    aria-label="Attach"
+                    aria-expanded={attachMenu}
                     disabled={identityStatus !== "ready"}
-                    onClick={() => filePicker.current?.click()}
+                    onClick={() => setAttachMenu((open) => !open)}
                     className="-ml-2.5 grid size-10 shrink-0 place-items-center rounded-full text-[var(--ink-2)] hover:bg-[var(--hairline)] disabled:opacity-40"
                   >
-                    <ImagePlus size={20} />
+                    <Plus
+                      size={20}
+                      className={cn("transition-transform", attachMenu && "rotate-45")}
+                    />
                   </button>
                 </>
               ) : null}
@@ -1102,6 +1226,21 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         )}
       </footer>
       {lightbox ? <PhotoLightbox url={lightbox} onClose={() => setLightbox(null)} /> : null}
+      {recording ? (
+        <ClipRecorder
+          kind={recording}
+          onSend={(clip) => void sendClip(clip, recording)}
+          onClose={() => setRecording(null)}
+        />
+      ) : null}
+      {detailsOpen && chatSummary ? (
+        <ChatDetails
+          chat={chatSummary}
+          title={title}
+          memberNames={members.map((m) => m.displayName)}
+          onClose={() => setDetailsOpen(false)}
+        />
+      ) : null}
       {onceOpen ? (
         <OnceViewer
           photo={onceOpen}
@@ -1155,6 +1294,7 @@ function PhotoBody({
           messageId: item.id,
           photoKey: photo.key,
           mime: photo.mime,
+          media: photo.media,
         }
       : null;
   const caption = photo.caption ? <span className="mt-1.5 block">{photo.caption}</span> : null;
@@ -1182,7 +1322,9 @@ function PhotoBody({
       : "Not opened yet"
     : opened || (info && !info.available)
       ? "Opened"
-      : "Tap to view once";
+      : photo.media === "audio"
+        ? "Tap to listen once"
+        : "Tap to view once";
   return (
     <span className="block">
       <button
@@ -1203,10 +1345,22 @@ function PhotoBody({
             mine ? "bg-[color-mix(in_oklab,var(--mine-ink)_14%,transparent)]" : "bg-[var(--field)]",
           )}
         >
-          <Eye size={17} />
+          {photo.media === "audio" ? (
+            <Mic size={17} />
+          ) : photo.media === "video" ? (
+            <Video size={17} />
+          ) : (
+            <Eye size={17} />
+          )}
         </span>
         <span>
-          <span className="block font-semibold">Photo · view once</span>
+          <span className="block font-semibold">
+            {photo.media === "audio"
+              ? `Voice note · ${photo.duration.toFixed(0)} s`
+              : photo.media === "video"
+                ? `Video · view once`
+                : "Photo · view once"}
+          </span>
           <span className="block text-xs opacity-70">{status}</span>
         </span>
       </button>

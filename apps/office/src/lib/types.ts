@@ -21,6 +21,8 @@ export interface ChatSummary {
   kind: "direct" | "group";
   name: string | null;
   announcement: boolean;
+  ttlHours: number | null; // null: the global setting
+  muted: boolean;
   lastMessageAt: string | null;
   unread: number;
   memberIds: string[];
@@ -34,6 +36,7 @@ export interface AppState {
     isAdmin: boolean;
     publicKey: string | null;
     hideOnline: boolean;
+    autoLockMinutes: number;
   };
   people: Person[];
   chats: ChatSummary[];

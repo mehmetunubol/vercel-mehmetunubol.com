@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Eye, X } from "lucide-react";
-import { decryptPhoto, photoAad } from "@/lib/photo";
+import { Eye, Mic, Video, X } from "lucide-react";
+import { decryptPhoto, type MediaType, photoAad } from "@/lib/photo";
 
 /** Fetches and decrypts a photo; null while loading, "gone" if it can't be had. */
 export interface PhotoRef {
@@ -12,6 +12,7 @@ export interface PhotoRef {
   messageId: string;
   photoKey: string;
   mime: string;
+  media: MediaType;
 }
 
 async function loadPhoto({
@@ -122,7 +123,8 @@ export function PhotoLightbox({ url, onClose }: { url: string; onClose: () => vo
   );
 }
 
-const VIEW_SECONDS = 10;
+// Total time a one-time photo can be looked at (and the longest clip).
+const VIEW_SECONDS = 5;
 
 // The single fetch of a one-time photo, shared if the viewer mounts twice
 // (React does that in development); dropped when the viewer is closed.
@@ -138,10 +140,11 @@ function loadOnce(photo: PhotoRef) {
 }
 
 /**
- * One-time photo viewer. Opening it fetches the photo (which uses up this
- * person's single view). The picture is drawn on a canvas, so there is no
- * image to long-press and save, and it's only visible while a finger is
- * pressed, for 10 seconds in total. Leaving the app or closing ends it.
+ * One-time photo / voice note / video viewer. Opening it fetches the item
+ * (which uses up this person's single view). It's only shown or played while
+ * a finger is pressed, for 5 seconds in total; a clip also closes when it
+ * ends. Photos are drawn on a canvas, so there's no image to long-press and
+ * save. Leaving the app or closing ends it.
  */
 export function OnceViewer({
   photo,
@@ -150,11 +153,16 @@ export function OnceViewer({
   photo: PhotoRef;
   onClose: (viewed: boolean) => void;
 }) {
+  const isClip = photo.media !== "photo";
+  // A clip gets a little extra time so a full 5-second recording can finish.
+  const budget = (isClip ? VIEW_SECONDS + 1 : VIEW_SECONDS) * 1000;
   const canvas = useRef<HTMLCanvasElement>(null);
   const bitmap = useRef<ImageBitmap | null>(null);
+  const player = useRef<HTMLMediaElement | null>(null);
+  const [clipUrl, setClipUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "gone">("loading");
   const [holding, setHolding] = useState(false);
-  const [left, setLeft] = useState(VIEW_SECONDS * 1000);
+  const [left, setLeft] = useState(budget);
   const viewed = useRef(false);
   const closeRef = useRef((seen: boolean) => {
     onceLoads.delete(photo.attachmentId);
@@ -170,12 +178,18 @@ export function OnceViewer({
   // Load once; free the decoded image when the viewer goes away.
   useEffect(() => {
     let cancelled = false;
+    let url: string | null = null;
     void loadOnce(photo)
       .then(async (blob) => {
         if (cancelled) return;
         if (!blob) return setStatus("gone");
         viewed.current = true;
-        bitmap.current = await createImageBitmap(blob);
+        if (isClip) {
+          url = URL.createObjectURL(blob);
+          setClipUrl(url);
+        } else {
+          bitmap.current = await createImageBitmap(blob);
+        }
         setStatus("ready");
       })
       .catch(() => !cancelled && setStatus("gone"));
@@ -183,6 +197,8 @@ export function OnceViewer({
       cancelled = true;
       bitmap.current?.close();
       bitmap.current = null;
+      player.current?.pause();
+      if (url) URL.revokeObjectURL(url);
     };
     // Opening uses up the single view, so this must run exactly once per viewer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -201,6 +217,14 @@ export function OnceViewer({
       window.removeEventListener("pagehide", end);
     };
   }, []);
+
+  // Clips: play while held, pause on release.
+  useEffect(() => {
+    const el = player.current;
+    if (!isClip || !el || status !== "ready") return;
+    if (holding) void el.play().catch(() => {});
+    else el.pause();
+  }, [holding, status, isClip]);
 
   // Draw while holding; wipe the canvas the moment the finger lifts.
   useEffect(() => {
@@ -242,7 +266,13 @@ export function OnceViewer({
   return (
     <div
       role="dialog"
-      aria-label="One-time photo"
+      aria-label={
+        photo.media === "audio"
+          ? "One-time voice note"
+          : photo.media === "video"
+            ? "One-time video"
+            : "One-time photo"
+      }
       className="fixed inset-0 z-50 grid touch-none place-items-center bg-black select-none [-webkit-touch-callout:none]"
       onContextMenu={(e) => e.preventDefault()}
       onPointerDown={() => press(true)}
@@ -250,28 +280,72 @@ export function OnceViewer({
       onPointerLeave={() => press(false)}
       onPointerCancel={() => press(false)}
     >
-      <canvas ref={canvas} className={holding ? "block" : "hidden"} />
+      {isClip ? (
+        photo.media === "video" ? (
+          <video
+            ref={(el) => {
+              player.current = el;
+            }}
+            src={clipUrl ?? undefined}
+            playsInline
+            disablePictureInPicture
+            controls={false}
+            controlsList="nodownload noremoteplayback"
+            onEnded={() => closeRef.current(true)}
+            className={holding ? "block max-h-full max-w-full" : "hidden"}
+          />
+        ) : (
+          <audio
+            ref={(el) => {
+              player.current = el;
+            }}
+            src={clipUrl ?? undefined}
+            controls={false}
+            onEnded={() => closeRef.current(true)}
+          />
+        )
+      ) : (
+        <canvas ref={canvas} className={holding ? "block" : "hidden"} />
+      )}
+      {holding && photo.media === "audio" ? (
+        <div className="text-center text-white">
+          <Mic className="mx-auto mb-3 animate-pulse" size={40} />
+          <p className="font-semibold">Playing…</p>
+        </div>
+      ) : null}
       {!holding ? (
         <div className="px-8 text-center text-white">
           {status === "loading" ? <p className="text-sm text-white/70">Opening…</p> : null}
           {status === "gone" ? (
             <p className="text-sm text-white/80">
-              This photo has already been opened, or it&rsquo;s no longer available.
+              This has already been opened, or it&rsquo;s no longer available.
             </p>
           ) : null}
           {status === "ready" ? (
             <>
-              <Eye className="mx-auto mb-3 text-white/80" size={28} />
-              <p className="font-semibold">Press and hold to view</p>
+              {photo.media === "audio" ? (
+                <Mic className="mx-auto mb-3 text-white/80" size={28} />
+              ) : photo.media === "video" ? (
+                <Video className="mx-auto mb-3 text-white/80" size={28} />
+              ) : (
+                <Eye className="mx-auto mb-3 text-white/80" size={28} />
+              )}
+              <p className="font-semibold">
+                {photo.media === "audio"
+                  ? "Press and hold to listen"
+                  : photo.media === "video"
+                    ? "Press and hold to play"
+                    : "Press and hold to view"}
+              </p>
               <p className="mt-1 text-sm text-white/60 tabular-nums">
-                {Math.ceil(left / 1000)} s left · can&rsquo;t be opened again
+                {`${Math.ceil(left / 1000)} s left · can’t be opened again`}
               </p>
             </>
           ) : null}
         </div>
       ) : (
         <span className="absolute bottom-6 rounded-full bg-black/50 px-3 py-1 text-xs text-white/80 tabular-nums">
-          {Math.ceil(left / 1000)} s
+          {`${Math.ceil(left / 1000)} s`}
         </span>
       )}
       <button

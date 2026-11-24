@@ -41,7 +41,9 @@ export default defineConfig({
     // The iPhone preset defaults to WebKit; these tests use Chromium.
     browserName: "chromium",
     timezoneId: "Europe/Istanbul",
-    trace: "off",
+trace: "off",
+    // Fake camera and microphone, for the voice note / video suite.
+    launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] },
     // Fail a stuck step quickly instead of using up the whole test timeout.
     actionTimeout: 20_000,
   },

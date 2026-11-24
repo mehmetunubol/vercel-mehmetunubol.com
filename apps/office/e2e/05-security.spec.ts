@@ -30,7 +30,7 @@ test("security: lockout alerts and panic buttons", async ({ browser }) => {
   const correctWhileLocked = await attempt(gate, "burak", "burak-new-1");
   ok(correctWhileLocked.includes(LOCKED), "correct password while locked: still locked");
 
-  await admin.waitForSelector("text=An account was locked after failed sign-in attempts", {
+  await admin.waitForSelector("text=New security alert: failed sign-in attempts", {
     timeout: 15000,
   });
   ok(

@@ -3,6 +3,7 @@ import { AppProvider } from "@/components/app-provider";
 import { TabBar } from "@/components/tab-bar";
 import { Gate } from "@/components/gate";
 import { SessionGuard } from "@/components/session-guard";
+import { AutoLock } from "@/components/auto-lock";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function SignedInLayout({ children }: { children: React.Rea
       <AppProvider userId={me.id}>
         {children}
         <TabBar isAdmin={me.isAdmin} />
+        <AutoLock />
       </AppProvider>
     </SessionGuard>
   );

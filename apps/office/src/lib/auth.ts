@@ -5,6 +5,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { ADMIN_USERNAME, LOCKOUT_MINUTES, MAX_FAILED_LOGINS } from "@/lib/constants";
+import { clientIp, isIpBlocked, recordFailure } from "@/lib/guessing";
 import { recordLockout } from "@/lib/security";
 import { getLoginsDisabled } from "@/lib/settings";
 
@@ -47,7 +48,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
       credentials: { username: {}, password: {} },
-      authorize: async (credentials) => {
+      authorize: async (credentials, request) => {
+        const ip = clientIp(request);
         const username =
           typeof credentials?.username === "string"
             ? credentials.username.trim().toLowerCase()
@@ -55,14 +57,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const password = typeof credentials?.password === "string" ? credentials.password : "";
         if (!username || !password) return null;
 
+        // Too many failures from this network address: same answer as a locked account.
+        if (await isIpBlocked(ip)) throw new AccountLocked();
+
         const [user] = await db.select().from(users).where(eq(users.username, username)).limit(1);
         // Panic switch: everyone except the admin sees a lockout, even for unknown usernames.
         if (user?.username !== ADMIN_USERNAME && (await getLoginsDisabled()))
           throw new AccountLocked();
-        if (!user) return null;
-        if (user.lockedUntil && user.lockedUntil > new Date()) throw new AccountLocked();
+        if (!user) {
+          await recordFailure(ip);
+          return null;
+        }
+        if (user.lockedUntil && user.lockedUntil > new Date()) {
+          await recordFailure(ip);
+          throw new AccountLocked();
+        }
 
         if (!(await compare(password, user.passwordHash))) {
+          await recordFailure(ip);
           const failed = user.failedLogins + 1;
           const locking = failed >= MAX_FAILED_LOGINS;
           await db

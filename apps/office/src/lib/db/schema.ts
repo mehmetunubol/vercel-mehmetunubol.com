@@ -45,6 +45,8 @@ export const users = pgTable("users", {
   lastSeenAt: tz("last_seen_at"),
   // Hide my online status (and typing). Reciprocal: you then don't see others'.
   hideOnline: boolean("hide_online").default(false).notNull(),
+  // Auto-lock: back to the decoy after this many idle minutes.
+  autoLockMinutes: integer("auto_lock_minutes").default(5).notNull(),
   failedLogins: integer("failed_logins").default(0).notNull(),
   lockedUntil: tz("locked_until"),
   createdAt: tz("created_at").defaultNow().notNull(),
@@ -63,6 +65,8 @@ export const conversations = pgTable("conversations", {
   directKey: varchar("direct_key", { length: 80 }).unique(),
   // Group where only the admin can post; members read (and react).
   announcement: boolean("announcement").default(false).notNull(),
+  // Message lifetime for this chat; null uses the global setting.
+  ttlHours: integer("ttl_hours"),
   createdAt: tz("created_at").defaultNow().notNull(),
 });
 
@@ -78,6 +82,8 @@ export const conversationMembers = pgTable(
     lastReadAt: tz("last_read_at").defaultNow().notNull(),
     // Last "typing…" signal in this conversation.
     typingAt: tz("typing_at"),
+    // No notifications from this chat until then (far future = always).
+    mutedUntil: tz("muted_until"),
     joinedAt: tz("joined_at").defaultNow().notNull(),
   },
   (t) => [
@@ -183,6 +189,8 @@ export const securityAlerts = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     kind: varchar("kind", { length: 32 }).notNull(),
     userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    // e.g. the network address for "ip_blocked" alerts.
+    detail: varchar("detail", { length: 200 }),
     createdAt: tz("created_at").defaultNow().notNull(),
     seenAt: tz("seen_at"),
   },
@@ -250,4 +258,15 @@ export const attachmentViews = pgTable(
     viewedAt: tz("viewed_at").defaultNow().notNull(),
   },
   (t) => [primaryKey({ columns: [t.attachmentId, t.userId] })],
+);
+
+// Failed sign-ins per network address, for the guessing limit.
+export const signInFailures = pgTable(
+  "sign_in_failures",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    ip: varchar("ip", { length: 64 }).notNull(),
+    createdAt: tz("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("sign_in_failures_ip_created_idx").on(t.ip, t.createdAt)],
 );

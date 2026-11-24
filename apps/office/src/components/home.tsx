@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
-import { CalendarDays, Megaphone, MessageCircle, ShieldAlert, Users } from "lucide-react";
+import { BellOff, CalendarDays, Megaphone, MessageCircle, ShieldAlert, Users } from "lucide-react";
 import { useEvents } from "@/components/use-events";
 import { dayHeading, endOf, timeRange } from "@/lib/event-time";
 import { useApp, useNow } from "@/components/app-provider";
@@ -77,8 +77,8 @@ export function Home() {
             {state.admin.securityAlerts > 0 ? (
               <span className="block font-semibold">
                 {state.admin.securityAlerts === 1
-                  ? "An account was locked after failed sign-in attempts"
-                  : `${state.admin.securityAlerts} accounts were locked after failed sign-in attempts`}
+                  ? "New security alert: failed sign-in attempts"
+                  : `${state.admin.securityAlerts} new security alerts: failed sign-in attempts`}
               </span>
             ) : null}
             {state.admin.loginsDisabled ? (
@@ -189,8 +189,21 @@ export function Home() {
                         {chat.lastMessageAt ? ` · ${timeLabel(chat.lastMessageAt)}` : ""}
                       </span>
                     </span>
+                    {chat.muted ? (
+                      <BellOff
+                        size={14}
+                        className="shrink-0 text-[var(--ink-3)]"
+                        aria-label="Muted"
+                      />
+                    ) : null}
                     {chat.unread > 0 ? (
-                      <span className="min-w-6 rounded-full bg-[var(--mine)] px-2 py-0.5 text-center text-xs font-semibold text-[var(--mine-ink)] tabular-nums">
+                      <span
+                        className={
+                          chat.muted
+                            ? "min-w-6 rounded-full bg-[var(--field)] px-2 py-0.5 text-center text-xs font-semibold text-[var(--ink-2)] tabular-nums"
+                            : "min-w-6 rounded-full bg-[var(--mine)] px-2 py-0.5 text-center text-xs font-semibold text-[var(--mine-ink)] tabular-nums"
+                        }
+                      >
                         {chat.unread}
                       </span>
                     ) : null}
