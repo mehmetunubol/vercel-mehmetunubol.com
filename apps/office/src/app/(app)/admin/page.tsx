@@ -1,8 +1,15 @@
 import { asc, desc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { ChevronDown, Megaphone, ShieldAlert } from "lucide-react";
+import { ChevronDown, History, Megaphone, ShieldAlert } from "lucide-react";
 import { db } from "@/lib/db";
-import { conversationMembers, conversations, securityAlerts, users } from "@/lib/db/schema";
+import {
+  adminLog,
+  conversationMembers,
+  conversations,
+  securityAlerts,
+  users,
+} from "@/lib/db/schema";
+import { deleteOldAdminLog } from "@/lib/admin-log";
 import { getCurrentUser } from "@/lib/session";
 import { applyDuePlans } from "@/lib/presence";
 import { getLoginsDisabled, getMessageTtlHours } from "@/lib/settings";
@@ -124,7 +131,8 @@ export default async function AdminPage() {
   if (!me?.isAdmin) redirect("/");
   await applyDuePlans();
 
-  const [people, groups, members, ttlHours, alerts, loginsDisabled] = await Promise.all([
+  await deleteOldAdminLog();
+  const [people, groups, members, ttlHours, alerts, loginsDisabled, activity] = await Promise.all([
     db.select().from(users).orderBy(asc(users.displayName)),
     db
       .select()
@@ -152,6 +160,7 @@ export default async function AdminPage() {
       .orderBy(desc(securityAlerts.createdAt))
       .limit(20),
     getLoginsDisabled(),
+    db.select().from(adminLog).orderBy(desc(adminLog.createdAt)).limit(50),
   ]);
   const unseen = alerts.filter((a) => !a.seenAt).length;
   const now = new Date();
@@ -424,6 +433,29 @@ export default async function AdminPage() {
               <span className="text-sm text-[var(--ink-2)]">hours</span>
             </label>
           </ActionForm>
+        </div>
+      </Section>
+      <Section title="Activity" hint="What was changed here, newest first. Kept for 90 days.">
+        <div className="px-3 pb-3">
+          {activity.length === 0 ? (
+            <p className="text-sm text-[var(--ink-2)]">Nothing yet.</p>
+          ) : null}
+          <ul className="divide-y divide-[var(--hairline)]">
+            {activity.map((entry) => (
+              <li key={entry.id} className="flex items-start gap-3 py-2.5">
+                <History
+                  size={15}
+                  className={`mt-0.5 shrink-0 ${entry.action.startsWith("panic.") ? "text-[var(--danger)]" : "text-[var(--ink-3)]"}`}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm">{entry.detail ?? entry.action}</p>
+                  <p className="text-xs text-[var(--ink-3)] tabular-nums">
+                    <LocalTime iso={entry.createdAt.toISOString()} />
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       </Section>
     </main>

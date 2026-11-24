@@ -18,7 +18,11 @@ setup and the encryption design.
 - Code avoids DB transactions so both drivers (neon-http in prod, node-postgres
   locally with `DATABASE_DRIVER=pg`) behave alike.
 - Migrations: `pnpm db:generate` creates them; the user runs `pnpm db:migrate`.
-- Before done: `pnpm typecheck && pnpm lint && pnpm test`.
+- Before done: `pnpm typecheck && pnpm lint && pnpm test`, and for UI or API
+  changes the browser tests too: `E2E_DATABASE_URL=<local db> pnpm e2e` (see
+  `e2e/README.md`). Add or update a suite step for new behaviour. Assertions
+  must not depend on the time of day (the planner switches modes after 22:00,
+  and "in 2 h" becomes "tomorrow at …" near midnight).
 - Decoy gate: signed-out visitors get `components/gate.tsx` at every URL
   (`proxy.ts` rewrites to `/`, whose layout renders the gate). Keep app copy,
   metadata and the manifest free of anything that reveals what the app is.

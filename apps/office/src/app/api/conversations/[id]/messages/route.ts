@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { conversationMembers, messageReactions, messages } from "@/lib/db/schema";
 import { deleteExpiredMessages } from "@/lib/cleanup";
@@ -31,8 +31,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     iv: messages.iv,
     // Only hand out the caller's own wrapped key.
     wrappedKey: sql<string | null>`${messages.keys} ->> ${me.id}`,
+    replyToId: messages.replyToId,
+    editedAt: messages.editedAt,
     createdAt: messages.createdAt,
     expiresAt: messages.expiresAt,
+    // Clients poll from the latest of these, so edits come through too.
+    updatedAt:
+      sql<string>`greatest(${messages.createdAt}, coalesce(${messages.editedAt}, ${messages.createdAt}))`.mapWith(
+        (v: string | Date) => new Date(v),
+      ),
   };
 
   const rows =
@@ -40,7 +47,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       ? await db
           .select(columns)
           .from(messages)
-          .where(and(eq(messages.conversationId, id), live, gte(messages.createdAt, after)))
+          .where(
+            and(
+              eq(messages.conversationId, id),
+              live,
+              or(gte(messages.createdAt, after), gte(messages.editedAt, after)),
+            ),
+          )
           .orderBy(asc(messages.createdAt))
           .limit(200)
       : (
@@ -95,6 +108,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const parsed = sendMessageSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest("invalid message");
   const body = parsed.data;
+  // A reply must point at a live message in the same conversation; otherwise drop it.
+  let replyToId: string | null = null;
+  if (body.replyToId) {
+    const [target] = await db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.id, body.replyToId),
+          eq(messages.conversationId, id),
+          gt(messages.expiresAt, sql`now()`),
+        ),
+      )
+      .limit(1);
+    replyToId = target?.id ?? null;
+  }
   if (body.senderPublicKey !== me.publicKey) {
     return Response.json({ error: "stale key" }, { status: 409 });
   }
@@ -115,6 +144,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       ciphertext: body.ciphertext,
       iv: body.iv,
       keys,
+      replyToId,
       expiresAt: sql`now() + make_interval(hours => ${ttlHours})`,
     })
     .onConflictDoNothing()

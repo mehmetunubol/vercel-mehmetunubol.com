@@ -10,6 +10,8 @@ import { ADMIN_USERNAME, MIN_PASSWORD_LENGTH, USERNAME_PATTERN } from "@/lib/con
 import { getCurrentUser } from "@/lib/session";
 import { markAllAlertsSeen } from "@/lib/security";
 import { setLoginsDisabled, setMessageTtlHours } from "@/lib/settings";
+import { logAdmin } from "@/lib/admin-log";
+import { events } from "@/lib/db/schema";
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; message: string };
 
@@ -17,6 +19,16 @@ async function requireAdmin() {
   const me = await getCurrentUser();
   if (!me?.isAdmin) throw new Error("Not authorized");
   return me;
+}
+
+/** "Ayşe Demir (@ayse)" for the activity log. */
+async function who(userId: string) {
+  const [u] = await db
+    .select({ displayName: users.displayName, username: users.username })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return u ? `${u.displayName} (@${u.username})` : "an unknown user";
 }
 
 function done(message?: string): ActionResult {
@@ -54,6 +66,7 @@ export async function createUser(_: ActionResult | null, form: FormData): Promis
     .onConflictDoNothing()
     .returning({ id: users.id });
   if (!inserted.length) return { ok: false, message: `"${parsed.data.username}" already exists.` };
+  await logAdmin("user.created", `Added ${parsed.data.displayName} (@${parsed.data.username})`);
   return done(`Added ${parsed.data.displayName}.`);
 }
 
@@ -63,10 +76,12 @@ export async function renameUser(_: ActionResult | null, form: FormData): Promis
     .object({ userId: z.uuid(), displayName: z.string().trim().min(1).max(64) })
     .safeParse(Object.fromEntries(form));
   if (!parsed.success) return { ok: false, message: "Display name is required." };
+  const before = await who(parsed.data.userId);
   await db
     .update(users)
     .set({ displayName: parsed.data.displayName })
     .where(eq(users.id, parsed.data.userId));
+  await logAdmin("user.renamed", `Renamed ${before} to ${parsed.data.displayName}`);
   return done("Saved.");
 }
 
@@ -92,6 +107,7 @@ export async function resetPassword(_: ActionResult | null, form: FormData): Pro
       tokenVersion: sql`${users.tokenVersion} + 1`,
     })
     .where(eq(users.id, parsed.data.userId));
+  await logAdmin("user.password_reset", `Reset the password of ${await who(parsed.data.userId)}`);
   return done("Password reset. They've been signed out everywhere.");
 }
 
@@ -117,6 +133,7 @@ export async function deleteUser(_: ActionResult | null, form: FormData): Promis
       ),
     );
   await db.delete(users).where(eq(users.id, target.id));
+  await logAdmin("user.deleted", `Removed ${target.displayName} (@${target.username})`);
   return done(`Removed ${target.displayName}.`);
 }
 
@@ -149,6 +166,10 @@ export async function createGroup(_: ActionResult | null, form: FormData): Promi
     .insert(conversationMembers)
     .values(parsed.data.memberIds.map((userId) => ({ conversationId: group!.id, userId })))
     .onConflictDoNothing();
+  await logAdmin(
+    "group.created",
+    `Created ${parsed.data.announcement ? "announcement group" : "group"} "${parsed.data.name}" with ${parsed.data.memberIds.length} members`,
+  );
   return done(`Created ${parsed.data.name}.`);
 }
 
@@ -183,6 +204,10 @@ export async function updateGroup(_: ActionResult | null, form: FormData): Promi
     .insert(conversationMembers)
     .values(parsed.data.memberIds.map((userId) => ({ conversationId: id, userId })))
     .onConflictDoNothing();
+  await logAdmin(
+    "group.updated",
+    `Updated ${parsed.data.announcement ? "announcement group" : "group"} "${parsed.data.name}" (${parsed.data.memberIds.length} members)`,
+  );
   return done("Group saved.");
 }
 
@@ -190,9 +215,15 @@ export async function deleteGroup(_: ActionResult | null, form: FormData): Promi
   await requireAdmin();
   const groupId = z.uuid().safeParse(form.get("groupId"));
   if (!groupId.success) return { ok: false, message: "Unknown group." };
+  const [group] = await db
+    .select({ name: conversations.name })
+    .from(conversations)
+    .where(eq(conversations.id, groupId.data))
+    .limit(1);
   await db
     .delete(conversations)
     .where(and(eq(conversations.id, groupId.data), eq(conversations.kind, "group")));
+  await logAdmin("group.deleted", `Deleted group "${group?.name ?? "unknown"}" and its messages`);
   return done("Group deleted.");
 }
 
@@ -202,6 +233,7 @@ export async function saveSettings(_: ActionResult | null, form: FormData): Prom
   if (!Number.isFinite(hours) || hours <= 0)
     return { ok: false, message: "Enter a number of hours." };
   await setMessageTtlHours(hours);
+  await logAdmin("settings.message_ttl", `Set message lifetime to ${Math.round(hours)} hours`);
   return done("Saved. Applies to new messages.");
 }
 
@@ -214,6 +246,7 @@ export async function unlockUser(_: ActionResult | null, form: FormData): Promis
     .update(users)
     .set({ failedLogins: 0, lockedUntil: null })
     .where(eq(users.id, userId.data));
+  await logAdmin("user.unlocked", `Unlocked ${await who(userId.data)}`);
   return done("Unlocked.");
 }
 
@@ -227,7 +260,16 @@ export async function markAlertsSeen(): Promise<ActionResult> {
 export async function purgeAllMessages(): Promise<ActionResult> {
   await requireAdmin();
   const deleted = await db.delete(messages).returning({ id: messages.id });
+  await logAdmin("panic.messages_deleted", `Deleted all messages (${deleted.length})`);
   return done(`Deleted ${deleted.length} ${deleted.length === 1 ? "message" : "messages"}.`);
+}
+
+/** Panic button: deletes every event, past and upcoming. */
+export async function purgeAllEvents(): Promise<ActionResult> {
+  await requireAdmin();
+  const deleted = await db.delete(events).returning({ id: events.id });
+  await logAdmin("panic.events_deleted", `Deleted all events (${deleted.length})`);
+  return done(`Deleted ${deleted.length} ${deleted.length === 1 ? "event" : "events"}.`);
 }
 
 /**
@@ -243,6 +285,10 @@ export async function setSignInsDisabled(disabled: boolean): Promise<ActionResul
       .set({ tokenVersion: sql`${users.tokenVersion} + 1` })
       .where(ne(users.id, me.id));
   }
+  await logAdmin(
+    disabled ? "panic.signins_disabled" : "panic.signins_enabled",
+    disabled ? "Disabled sign-ins and signed everyone else out" : "Enabled sign-ins again",
+  );
   return done(
     disabled ? "Sign-ins disabled. Everyone else has been signed out." : "Sign-ins enabled again.",
   );

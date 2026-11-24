@@ -9,9 +9,13 @@ import {
   ChevronLeft,
   LockKeyhole,
   Megaphone,
+  Pencil,
+  Reply,
   ThumbsDown,
   ThumbsUp,
+  Trash2,
   Users,
+  X,
 } from "lucide-react";
 import { cn } from "@repo/ui";
 import { useApp, usePolling } from "@/components/app-provider";
@@ -59,8 +63,11 @@ interface WireMessage {
   ciphertext: string;
   iv: string;
   wrappedKey: string | null;
+  replyToId: string | null;
+  editedAt: string | null;
   createdAt: string;
   expiresAt: string;
+  updatedAt: string;
 }
 
 type Body =
@@ -72,8 +79,17 @@ interface Item {
   createdAt: string;
   expiresAt: string;
   body: Body;
+  replyToId?: string | null;
+  editedAt?: string | null;
   sending?: boolean;
   error?: boolean;
+}
+
+/** First line of a message, shortened, for reply quotes. */
+function snippet(body: Body | undefined) {
+  if (!body || body.kind !== "text") return "Message";
+  const line = body.text.split("\n")[0]!.trim();
+  return line.length > 80 ? `${line.slice(0, 80)}…` : line;
 }
 
 export function ChatView({ conversationId }: { conversationId: string }) {
@@ -87,6 +103,11 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   const [reactions, setReactions] = useState<WireReaction[]>([]);
   // Tapping a bubble selects it: reactions for received messages, read details for your own.
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // The composer either writes a new message, a reply to one, or edits one of yours.
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const composer = useRef<HTMLTextAreaElement>(null);
   const wire = useRef<Map<string, WireMessage>>(new Map());
   const cursor = useRef<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -138,6 +159,8 @@ export function ChatView({ conversationId }: { conversationId: string }) {
             senderId: m.senderId,
             createdAt: m.createdAt,
             expiresAt: m.expiresAt,
+            replyToId: m.replyToId,
+            editedAt: m.editedAt,
             body,
           };
         }),
@@ -193,12 +216,18 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       for (const m of gone) next.delete(m.id);
       return next;
     });
-    const fresh = messages.filter((m) => !wire.current.has(m.id));
+    // New messages, plus ones edited since we last decrypted them.
+    const added = messages.filter((m) => !wire.current.has(m.id));
+    const changed = messages.filter(
+      (m) => wire.current.has(m.id) && wire.current.get(m.id)!.editedAt !== m.editedAt,
+    );
     for (const m of messages) wire.current.set(m.id, m);
-    if (messages.length) cursor.current = messages[messages.length - 1]!.createdAt;
-    if (fresh.length) {
-      await decryptInto(fresh);
-      if (identityRef.current && fresh.some((m) => m.senderId !== meId)) await markRead();
+    for (const m of messages) {
+      if (!cursor.current || m.updatedAt > cursor.current) cursor.current = m.updatedAt;
+    }
+    if (added.length || changed.length) {
+      await decryptInto([...added, ...changed]);
+      if (identityRef.current && added.some((m) => m.senderId !== meId)) await markRead();
     }
   }, [conversationId, decryptInto, meId, markRead]);
 
@@ -295,9 +324,96 @@ export function ChatView({ conversationId }: { conversationId: string }) {
     }).catch(() => {});
   }
 
+  function recipientsFor(conv: Conversation, me: string, myKey: string) {
+    const recipients = Object.fromEntries(
+      conv.members.filter((m) => m.publicKey).map((m) => [m.id, m.publicKey!]),
+    );
+    recipients[me] = myKey;
+    return recipients;
+  }
+
+  function startReply(id: string) {
+    setEditing(null);
+    setReplyTo(id);
+    setSelectedId(null);
+    composer.current?.focus();
+  }
+
+  function startEdit(item: Item) {
+    if (item.body.kind !== "text") return;
+    setReplyTo(null);
+    setEditing(item.id);
+    setDraft(item.body.text);
+    setSelectedId(null);
+    composer.current?.focus();
+  }
+
+  function cancelCompose() {
+    if (editing) setDraft("");
+    setEditing(null);
+    setReplyTo(null);
+  }
+
+  /** Re-encrypts the new text under the same message id and saves it. */
+  async function saveEdit(id: string, text: string) {
+    if (!identity || !meId || !conversation) return;
+    const before = items.get(id);
+    if (!before) return;
+    setItems((prev) =>
+      new Map(prev).set(id, {
+        ...before,
+        body: { kind: "text", text },
+        editedAt: new Date().toISOString(),
+      }),
+    );
+    setEditing(null);
+    setDraft("");
+    try {
+      const encrypted = await encryptMessage(
+        text,
+        identity,
+        recipientsFor(conversation, meId, identity.publicKey),
+        messageAad(conversation.id, meId, id),
+      );
+      const response = await fetch(`/api/conversations/${conversation.id}/messages/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ senderPublicKey: identity.publicKey, ...encrypted }),
+      });
+      if (!response.ok) throw new Error();
+    } catch {
+      setItems((prev) => new Map(prev).set(id, before));
+      setNotice("Couldn't save the edit.");
+    }
+  }
+
+  async function deleteMessage(id: string) {
+    if (!conversation || !window.confirm("Delete this message for everyone?")) return;
+    setSelectedId(null);
+    const before = items.get(id);
+    setItems((prev) => {
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
+    const response = await fetch(`/api/conversations/${conversation.id}/messages/${id}`, {
+      method: "DELETE",
+    }).catch(() => null);
+    if (response?.ok) {
+      wire.current.delete(id);
+    } else if (before) {
+      setItems((prev) => new Map(prev).set(id, before));
+      setNotice("Couldn't delete the message.");
+    }
+  }
+
   async function send() {
     const text = draft.trim();
     if (!text || !identity || !meId || !conversation) return;
+    setNotice(null);
+    if (editing) return saveEdit(editing, text);
+    const replyToId = replyTo;
+    setReplyTo(null);
     const id = crypto.randomUUID();
     const nowIso = new Date().toISOString();
     const optimistic: Item = {
@@ -306,6 +422,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       createdAt: nowIso,
       expiresAt: new Date(Date.now() + (state?.ttlHours ?? 24) * 3_600_000).toISOString(),
       body: { kind: "text", text },
+      replyToId,
       sending: true,
     };
     setItems((prev) => new Map(prev).set(id, optimistic));
@@ -313,20 +430,16 @@ export function ChatView({ conversationId }: { conversationId: string }) {
     stickToBottom.current = true;
 
     try {
-      const recipients = Object.fromEntries(
-        conversation.members.filter((m) => m.publicKey).map((m) => [m.id, m.publicKey!]),
-      );
-      recipients[meId] = identity.publicKey;
       const encrypted = await encryptMessage(
         text,
         identity,
-        recipients,
+        recipientsFor(conversation, meId, identity.publicKey),
         messageAad(conversation.id, meId, id),
       );
       const response = await fetch(`/api/conversations/${conversation.id}/messages`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id, senderPublicKey: identity.publicKey, ...encrypted }),
+        body: JSON.stringify({ id, replyToId, senderPublicKey: identity.publicKey, ...encrypted }),
       });
       if (!response.ok) throw new Error();
       const saved = (await response.json()) as { createdAt: string; expiresAt: string };
@@ -420,6 +533,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
               return (
                 <div
                   key={item.id}
+                  id={`msg-${item.id}`}
                   className={cn(
                     "flex flex-col",
                     mine ? "items-end" : "items-start",
@@ -455,6 +569,39 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                       selected && "ring-2 ring-[color-mix(in_oklab,var(--ink)_25%,transparent)]",
                     )}
                   >
+                    {item.replyToId !== undefined && item.replyToId !== null ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const target = document.getElementById(`msg-${item.replyToId}`);
+                          target?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }}
+                        className={cn(
+                          "mb-1 block w-full rounded-lg border-l-2 px-2 py-1 text-left text-[13px] leading-snug",
+                          mine
+                            ? "border-[var(--mine-ink)]/50 bg-[color-mix(in_oklab,var(--mine-ink)_12%,transparent)]"
+                            : "border-[var(--ink-3)] bg-[var(--field)]",
+                        )}
+                      >
+                        {items.has(item.replyToId) ? (
+                          <>
+                            <span className="block font-semibold">
+                              {items.get(item.replyToId)!.senderId === meId
+                                ? "You"
+                                : nameOf(items.get(item.replyToId)!.senderId)}
+                            </span>
+                            <span className="line-clamp-2 opacity-80">
+                              {snippet(items.get(item.replyToId)!.body)}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="italic opacity-70">
+                            Original message is no longer available
+                          </span>
+                        )}
+                      </button>
+                    ) : null}
                     {item.body.kind === "text" ? (
                       item.body.text
                     ) : (
@@ -507,6 +654,16 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                           {kind === "up" ? <ThumbsUp size={17} /> : <ThumbsDown size={17} />}
                         </button>
                       ))}
+                      {canPost ? (
+                        <button
+                          type="button"
+                          aria-label="Reply"
+                          onClick={() => startReply(item.id)}
+                          className="grid size-9 place-items-center rounded-full hover:bg-[var(--hairline)]"
+                        >
+                          <Reply size={17} />
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
 
@@ -525,6 +682,34 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                     </div>
                   ) : null}
 
+                  {selected && mine && !item.sending && !item.error ? (
+                    <div className="glass-strong rise mt-1 flex gap-1 rounded-full p-1">
+                      <button
+                        type="button"
+                        onClick={() => startReply(item.id)}
+                        className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold hover:bg-[var(--hairline)]"
+                      >
+                        <Reply size={14} /> Reply
+                      </button>
+                      {item.body.kind === "text" ? (
+                        <button
+                          type="button"
+                          onClick={() => startEdit(item)}
+                          className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold hover:bg-[var(--hairline)]"
+                        >
+                          <Pencil size={14} /> Edit
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => void deleteMessage(item.id)}
+                        className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-[var(--danger)] hover:bg-[var(--hairline)]"
+                      >
+                        <Trash2 size={14} /> Delete
+                      </button>
+                    </div>
+                  ) : null}
+
                   {lastOfRun || selected ? (
                     <span
                       className={cn(
@@ -539,6 +724,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                       ) : (
                         <>
                           {timeLabel(item.createdAt)}
+                          {item.editedAt ? <span>· edited</span> : null}
                           {mine ? (
                             <ReceiptLabel
                               receipts={receipts}
@@ -568,42 +754,89 @@ export function ChatView({ conversationId }: { conversationId: string }) {
             <Megaphone size={16} /> Only {adminName} can post here. Tap a message to react.
           </p>
         ) : (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void send();
-            }}
-            className="glass-strong mx-auto flex max-w-3xl items-end gap-2 rounded-[1.6rem] p-1.5 pl-4"
-          >
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value.slice(0, MAX_MESSAGE_CHARS))}
-              onKeyDown={(e) => {
-                if (
-                  e.key === "Enter" &&
-                  !e.shiftKey &&
-                  !e.nativeEvent.isComposing &&
-                  window.matchMedia("(hover: hover)").matches
-                ) {
-                  e.preventDefault();
-                  void send();
-                }
+          <>
+            {notice ? (
+              <p role="alert" className="mx-auto mb-2 max-w-3xl px-2 text-xs text-[var(--danger)]">
+                {notice}
+              </p>
+            ) : null}
+            {replyTo || editing ? (
+              <div className="glass mx-auto mb-1.5 flex max-w-3xl items-center gap-2 rounded-2xl py-1.5 pr-1.5 pl-3 text-sm">
+                {editing ? (
+                  <Pencil size={15} className="shrink-0" />
+                ) : (
+                  <Reply size={15} className="shrink-0" />
+                )}
+                <span className="min-w-0 flex-1 truncate">
+                  {editing ? (
+                    <span className="font-semibold">Editing your message</span>
+                  ) : (
+                    <>
+                      <span className="font-semibold">
+                        Replying to{" "}
+                        {items.get(replyTo!)?.senderId === meId
+                          ? "yourself"
+                          : nameOf(items.get(replyTo!)?.senderId ?? "")}
+                      </span>
+                      <span className="text-[var(--ink-2)]">
+                        {" "}
+                        · {snippet(items.get(replyTo!)?.body)}
+                      </span>
+                    </>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  aria-label={editing ? "Cancel editing" : "Cancel reply"}
+                  onClick={cancelCompose}
+                  className="grid size-8 shrink-0 place-items-center rounded-full hover:bg-[var(--hairline)]"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            ) : null}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void send();
               }}
-              rows={1}
-              placeholder={identityStatus === "ready" ? "Message" : "Unlock to send messages"}
-              disabled={identityStatus !== "ready"}
-              aria-label="Message"
-              className="field-sizing-content max-h-40 min-h-10 flex-1 resize-none bg-transparent py-2 text-base outline-none placeholder:text-[var(--ink-3)]"
-            />
-            <button
-              type="submit"
-              aria-label="Send"
-              disabled={!draft.trim() || identityStatus !== "ready"}
-              className="btn btn-primary size-10 shrink-0 p-0"
+              className="glass-strong mx-auto flex max-w-3xl items-end gap-2 rounded-[1.6rem] p-1.5 pl-4"
             >
-              <ArrowUp size={20} strokeWidth={2.4} />
-            </button>
-          </form>
+              <textarea
+                ref={composer}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value.slice(0, MAX_MESSAGE_CHARS))}
+                onKeyDown={(e) => {
+                  if (
+                    e.key === "Enter" &&
+                    !e.shiftKey &&
+                    !e.nativeEvent.isComposing &&
+                    window.matchMedia("(hover: hover)").matches
+                  ) {
+                    e.preventDefault();
+                    void send();
+                  }
+                }}
+                rows={1}
+                placeholder={identityStatus === "ready" ? "Message" : "Unlock to send messages"}
+                disabled={identityStatus !== "ready"}
+                aria-label="Message"
+                className="field-sizing-content max-h-40 min-h-10 flex-1 resize-none bg-transparent py-2 text-base outline-none placeholder:text-[var(--ink-3)]"
+              />
+              <button
+                type="submit"
+                aria-label={editing ? "Save edit" : "Send"}
+                disabled={!draft.trim() || identityStatus !== "ready"}
+                className="btn btn-primary size-10 shrink-0 p-0"
+              >
+                {editing ? (
+                  <Check size={20} strokeWidth={2.4} />
+                ) : (
+                  <ArrowUp size={20} strokeWidth={2.4} />
+                )}
+              </button>
+            </form>
+          </>
         )}
       </footer>
     </main>

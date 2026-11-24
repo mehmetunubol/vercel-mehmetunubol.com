@@ -18,6 +18,10 @@
     groups. Tap your own message to see who has and hasn't read it. Members who
     joined after a message was sent aren't counted, and a device whose key is
     locked doesn't mark anything as read.
+  - **Replies, edits and deletes**: tap a message to reply (the quote is
+    shown from each device's own decrypted copy). Your own messages can be
+    edited, re-encrypted on your device and marked "edited", or deleted for
+    everyone.
   - **Reactions**: 👍 / 👎 on received messages, one per person per message.
 - **Events**: anyone can plan an event with a title, a date and start time,
   an estimated duration and an optional description (up to 500 characters),
@@ -32,10 +36,13 @@
 - **Security alerts**: when any account is locked after 5 wrong passwords, the
   admin gets a banner, an Admin-tab badge, a nudge (below) and an entry under
   Admin → Security, with "Unlock now".
-- **Panic buttons** (Admin → Emergency): _Delete all messages now_, and
+- **Panic buttons** (Admin → Emergency): _Delete all messages now_, _Delete all events now_, and
   _Disable sign-ins_, which signs everyone but the admin out and blocks
   sign-in. Blocked users see the ordinary "account locked, try again in 15
   minutes" message.
+- **Activity log** (Admin → Activity): every admin action with its time:
+  people added, renamed, reset, unlocked or removed, group and setting
+  changes, and each panic button. Kept for 90 days.
 - **Notifications**: optional per device (Account → Notifications). They are
   deliberately content-free: the server sends an empty push, and the phone
   shows a random everyday line ("Reminder: Your weekly summary is ready").
@@ -87,6 +94,11 @@ Tailwind v4 · WebCrypto.
 4. **Run.** `pnpm --filter office dev` → http://localhost:3003
 
 To use a plain local Postgres instead of Neon, set `DATABASE_DRIVER=pg`.
+
+## Tests
+
+- Unit tests: `pnpm --filter office test`
+- Browser tests (needs a local Postgres): see [`e2e/README.md`](e2e/README.md)
 
 ## Deploy (Vercel, subdomain)
 

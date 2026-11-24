@@ -25,12 +25,16 @@ export const encryptedPrivateKeySchema = z
     }
   });
 
-export const sendMessageSchema = z.object({
-  id: z.uuid(),
+export const encryptedBodySchema = z.object({
   senderPublicKey: publicKeySchema,
   ciphertext: base64(24_000),
   iv: base64(32),
   keys: z.record(z.uuid(), base64(200)),
+});
+
+export const sendMessageSchema = encryptedBodySchema.extend({
+  id: z.uuid(),
+  replyToId: z.uuid().nullable().optional(),
 });
 
 export const presenceSchema = z

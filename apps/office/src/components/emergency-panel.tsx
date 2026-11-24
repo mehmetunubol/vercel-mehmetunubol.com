@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Ban, Trash2 } from "lucide-react";
-import { purgeAllMessages, setSignInsDisabled } from "@/app/(app)/admin/actions";
+import { Ban, CalendarX, Trash2 } from "lucide-react";
+import { purgeAllEvents, purgeAllMessages, setSignInsDisabled } from "@/app/(app)/admin/actions";
 
 export function EmergencyPanel({ loginsDisabled }: { loginsDisabled: boolean }) {
   const [pending, startTransition] = useTransition();
@@ -36,6 +36,25 @@ export function EmergencyPanel({ loginsDisabled }: { loginsDisabled: boolean }) 
           className="btn btn-danger btn-sm mt-3"
         >
           Delete all messages now
+        </button>
+      </div>
+
+      <div className="rounded-2xl border border-[color-mix(in_oklab,var(--danger)_30%,transparent)] p-3">
+        <p className="flex items-center gap-1.5 text-sm font-semibold">
+          <CalendarX size={15} /> Delete all events
+        </p>
+        <p className="mt-1 text-xs text-[var(--ink-2)]">
+          Permanently deletes every event, past and upcoming, with all invitations and answers.
+        </p>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() =>
+            run("Delete ALL events for everyone? This can't be undone.", () => purgeAllEvents())
+          }
+          className="btn btn-danger btn-sm mt-3"
+        >
+          Delete all events now
         </button>
       </div>
 

@@ -1,4 +1,5 @@
 import {
+  type AnyPgColumn,
   boolean,
   index,
   integer,
@@ -93,6 +94,13 @@ export const messages = pgTable(
     iv: varchar("iv", { length: 32 }).notNull(),
     // recipientUserId -> base64(iv || AES-GCM-wrapped message key)
     keys: jsonb("keys").$type<Record<string, string>>().notNull(),
+    // The message this one replies to (same conversation). Only the id is
+    // stored; clients show the quote from their own decrypted copy.
+    replyToId: uuid("reply_to_id").references((): AnyPgColumn => messages.id, {
+      onDelete: "set null",
+    }),
+    // Set when the sender edits (re-encrypts) the message.
+    editedAt: tz("edited_at"),
     createdAt: tz("created_at").defaultNow().notNull(),
     expiresAt: tz("expires_at").notNull(),
   },
@@ -188,4 +196,16 @@ export const pushSubscriptions = pgTable(
     lastSentAt: tz("last_sent_at"),
   },
   (t) => [index("push_subscriptions_user_idx").on(t.userId)],
+);
+
+// A dated record of admin actions (the admin is the only actor).
+export const adminLog = pgTable(
+  "admin_log",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    action: varchar("action", { length: 48 }).notNull(),
+    detail: varchar("detail", { length: 300 }),
+    createdAt: tz("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("admin_log_created_idx").on(t.createdAt)],
 );
