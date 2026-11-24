@@ -4,9 +4,11 @@ import { useState } from "react";
 import { LockKeyhole } from "lucide-react";
 import { useApp } from "@/components/app-provider";
 import { setupIdentity } from "@/lib/client-keys";
+import { useI18n } from "@/components/i18n-provider";
 
 /** Shown when this browser doesn't hold the user's private key (new device, cleared storage). */
 export function UnlockCard() {
+  const { t } = useI18n();
   const { setIdentity } = useApp();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -19,7 +21,7 @@ export function UnlockCard() {
     try {
       setIdentity(await setupIdentity(password));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't unlock.");
+      setError(t(e instanceof Error ? e.message : "Couldn't unlock."));
     } finally {
       setBusy(false);
     }
@@ -32,10 +34,12 @@ export function UnlockCard() {
     >
       <div className="flex items-center gap-2">
         <LockKeyhole size={18} />
-        <h2 className="font-semibold">Unlock messages on this device</h2>
+        <h2 className="font-semibold">{t("Unlock messages on this device")}</h2>
       </div>
       <p className="text-sm text-[var(--ink-2)]">
-        Messages are end-to-end encrypted. Enter your password to unlock your key in this browser.
+        {t(
+          "Messages are end-to-end encrypted. Enter your password to unlock your key in this browser.",
+        )}
       </p>
       <input
         name="password"
@@ -43,11 +47,11 @@ export function UnlockCard() {
         required
         autoComplete="current-password"
         className="field"
-        placeholder="Password"
+        placeholder={t("Password")}
       />
       {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
       <button type="submit" disabled={busy} className="btn btn-primary w-full">
-        {busy ? "Unlocking…" : "Unlock"}
+        {busy ? t("Unlocking…") : t("Unlock")}
       </button>
     </form>
   );

@@ -92,6 +92,10 @@ disguised as **Day Planner** (see "Getting in").
   most one per device per minute. On iPhone they need the app on the Home
   Screen (iOS 16.4+). The phone still shows the installed app's name, and on
   Android browsers the web address, in the notification header.
+- **English and Turkish**: the interface follows the phone's language
+  (Turkish phones get Turkish, everything else English). Each person can pin
+  English or Türkçe under Account → Language. Before sign-in, the planner, its
+  name ("Günlük Planlayıcı") and the notification lines follow the phone.
 - **PWA**: installable on iOS and Android ("Add to Home Screen"), runs standalone,
   and shows an offline screen.
 
@@ -99,9 +103,10 @@ disguised as **Day Planner** (see "Getting in").
 
 To anyone who isn't signed in, the app is **"Day Planner"**: that's its
 installed name, its checklist icon, the browser tab title and the name shown on
-notifications. Every address (including `/login`) shows a small, working
-planner: Today (a to-do list), Week, Notes and Settings. Its items are kept only in that browser and never sent to the
-server. To sign in, **tap the date at the top three times quickly**. Taps more
+notifications (on a Turkish phone, **"Günlük Planlayıcı"**). Every address
+(including `/login`) shows a small, working planner: Today (a to-do list),
+Week, Notes and Settings. Its items are kept only in that browser and never
+sent to the server. To sign in, **tap the date at the top three times quickly**. Taps more
 than 0.8 s apart start the count again.
 
 Sessions end when you close the browser, the tab or the installed app. You

@@ -107,6 +107,7 @@ export async function GET() {
       publicKey: me.publicKey,
       hideOnline: me.hideOnline,
       autoLockMinutes: me.autoLockMinutes,
+      locale: me.locale,
     },
     people: visiblePeople.sort((a, b) =>
       a.username === ADMIN_USERNAME ? -1 : b.username === ADMIN_USERNAME ? 1 : 0,

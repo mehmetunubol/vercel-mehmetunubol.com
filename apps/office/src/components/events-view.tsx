@@ -9,9 +9,11 @@ import { MonthCalendar } from "@/components/month-calendar";
 import { useEvents } from "@/components/use-events";
 import { dayHeading, dayKey, endOf } from "@/lib/event-time";
 import type { EventItem } from "@/lib/types";
+import { useI18n } from "@/components/i18n-provider";
 
 export function EventsView() {
   const { state, personById } = useApp();
+  const { t, locale } = useI18n();
   const { events, respond } = useEvents();
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const meId = state?.me.id ?? "";
@@ -46,11 +48,11 @@ export function EventsView() {
     <main className="safe-top mx-auto w-full max-w-5xl px-4 pb-32 sm:px-6">
       <header className="flex items-end justify-between pt-4 pb-5">
         <div>
-          <p className="eyebrow">Calendar</p>
-          <h1 className="mt-1 text-3xl font-semibold">Events</h1>
+          <p className="eyebrow">{t("Calendar")}</p>
+          <h1 className="mt-1 text-3xl font-semibold">{t("Events")}</h1>
         </div>
         <Link href={newHref} className="btn btn-primary">
-          <Plus size={18} /> New event
+          <Plus size={18} /> {t("New event")}
         </Link>
       </header>
 
@@ -66,14 +68,16 @@ export function EventsView() {
           {selectedDay ? (
             <div className="flex items-center justify-between px-1">
               <p className="text-sm text-[var(--ink-2)]">
-                Showing {dayHeading(new Date(`${selectedDay}T12:00`))}
+                {t("Showing {day}", {
+                  day: dayHeading(new Date(`${selectedDay}T12:00`), new Date(), locale),
+                })}
               </p>
               <button
                 type="button"
                 onClick={() => setSelectedDay(null)}
                 className="btn btn-quiet btn-sm"
               >
-                Show all upcoming
+                {t("Show all upcoming")}
               </button>
             </div>
           ) : null}
@@ -81,14 +85,16 @@ export function EventsView() {
           {events && groups.length === 0 ? (
             <div className="glass rounded-[1.5rem] p-5 text-sm text-[var(--ink-2)]">
               {selectedDay
-                ? "Nothing planned that day."
-                : "No upcoming events. Create one and invite people."}
+                ? t("Nothing planned that day.")
+                : t("No upcoming events. Create one and invite people.")}
             </div>
           ) : null}
 
           {groups.map(([key, list]) => (
             <section key={key} className="space-y-2.5">
-              <h2 className="eyebrow px-1">{dayHeading(new Date(`${key}T12:00`))}</h2>
+              <h2 className="eyebrow px-1">
+                {dayHeading(new Date(`${key}T12:00`), new Date(), locale)}
+              </h2>
               {list.map((event) => (
                 <EventCard
                   key={event.id}

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Eye, Mic, Video, X } from "lucide-react";
 import { decryptPhoto, type MediaType, photoAad } from "@/lib/photo";
+import { useI18n } from "@/components/i18n-provider";
 
 /** Fetches and decrypts a photo; null while loading, "gone" if it can't be had. */
 export interface PhotoRef {
@@ -53,6 +54,7 @@ export function PhotoThumb({
   onOpen: (url: string) => void;
 }) {
   const attachmentId = photo?.attachmentId ?? null;
+  const { t } = useI18n();
   const [url, setUrl] = useState<string | null>(localUrl ?? null);
   const [failed, setFailed] = useState(false);
 
@@ -88,14 +90,14 @@ export function PhotoThumb({
       }}
       className="block w-[min(68vw,280px)] overflow-hidden rounded-[0.9rem] bg-[var(--field)]"
       style={{ aspectRatio: ratio, maxHeight: 360 }}
-      aria-label="Open photo"
+      aria-label={t("Open photo")}
     >
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element -- decrypted blob URL, not optimisable
         <img src={url} alt="" className="h-full w-full object-cover" />
       ) : (
         <span className="grid h-full place-items-center text-xs text-[var(--ink-3)]">
-          {failed ? "Photo unavailable" : "Loading…"}
+          {failed ? t("Photo unavailable") : t("Loading…")}
         </span>
       )}
     </button>
@@ -103,10 +105,11 @@ export function PhotoThumb({
 }
 
 export function PhotoLightbox({ url, onClose }: { url: string; onClose: () => void }) {
+  const { t } = useI18n();
   return (
     <div
       role="dialog"
-      aria-label="Photo"
+      aria-label={t("Photo")}
       onClick={onClose}
       className="fixed inset-0 z-50 grid place-items-center bg-black/90 p-4"
     >
@@ -114,7 +117,7 @@ export function PhotoLightbox({ url, onClose }: { url: string; onClose: () => vo
       <img src={url} alt="" className="max-h-full max-w-full rounded-lg object-contain" />
       <button
         type="button"
-        aria-label="Close"
+        aria-label={t("Close")}
         className="safe-top absolute top-3 right-3 grid size-10 place-items-center rounded-full bg-white/15 text-white"
       >
         <X size={20} />
@@ -154,6 +157,7 @@ export function OnceViewer({
   onClose: (viewed: boolean) => void;
 }) {
   const isClip = photo.media !== "photo";
+  const { t } = useI18n();
   // A clip gets a little extra time so a full 5-second recording can finish.
   const budget = (isClip ? VIEW_SECONDS + 1 : VIEW_SECONDS) * 1000;
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -268,10 +272,10 @@ export function OnceViewer({
       role="dialog"
       aria-label={
         photo.media === "audio"
-          ? "One-time voice note"
+          ? t("One-time voice note")
           : photo.media === "video"
-            ? "One-time video"
-            : "One-time photo"
+            ? t("One-time video")
+            : t("One-time photo")
       }
       className="fixed inset-0 z-50 grid touch-none place-items-center bg-black select-none [-webkit-touch-callout:none]"
       onContextMenu={(e) => e.preventDefault()}
@@ -310,15 +314,15 @@ export function OnceViewer({
       {holding && photo.media === "audio" ? (
         <div className="text-center text-white">
           <Mic className="mx-auto mb-3 animate-pulse" size={40} />
-          <p className="font-semibold">Playing…</p>
+          <p className="font-semibold">{t("Playing…")}</p>
         </div>
       ) : null}
       {!holding ? (
         <div className="px-8 text-center text-white">
-          {status === "loading" ? <p className="text-sm text-white/70">Opening…</p> : null}
+          {status === "loading" ? <p className="text-sm text-white/70">{t("Opening…")}</p> : null}
           {status === "gone" ? (
             <p className="text-sm text-white/80">
-              This has already been opened, or it&rsquo;s no longer available.
+              {t("This has already been opened, or it’s no longer available.")}
             </p>
           ) : null}
           {status === "ready" ? (
@@ -332,13 +336,13 @@ export function OnceViewer({
               )}
               <p className="font-semibold">
                 {photo.media === "audio"
-                  ? "Press and hold to listen"
+                  ? t("Press and hold to listen")
                   : photo.media === "video"
-                    ? "Press and hold to play"
-                    : "Press and hold to view"}
+                    ? t("Press and hold to play")
+                    : t("Press and hold to view")}
               </p>
               <p className="mt-1 text-sm text-white/60 tabular-nums">
-                {`${Math.ceil(left / 1000)} s left · can’t be opened again`}
+                {t("{n} s left · can’t be opened again", { n: Math.ceil(left / 1000) })}
               </p>
             </>
           ) : null}
@@ -350,7 +354,7 @@ export function OnceViewer({
       )}
       <button
         type="button"
-        aria-label="Close"
+        aria-label={t("Close")}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();

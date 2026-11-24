@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { cn } from "@repo/ui";
+import { useI18n } from "@/components/i18n-provider";
 
 // Everyday plans by weekday (0 = Monday), so the week never looks empty.
 const PLANS: string[][] = [
@@ -35,12 +36,13 @@ function useWeek() {
 }
 
 export function WeekPage() {
+  const { t, dateLocale } = useI18n();
   const week = useWeek();
   return (
     <>
-      <p className="eyebrow">This week</p>
-      <h1 className="mt-1 text-[2rem] leading-tight font-semibold">Week</h1>
-      <section className="glass mt-6 rounded-[1.75rem] p-2" aria-label="This week">
+      <p className="eyebrow">{t("This week")}</p>
+      <h1 className="mt-1 text-[2rem] leading-tight font-semibold">{t("Week")}</h1>
+      <section className="glass mt-6 rounded-[1.75rem] p-2" aria-label={t("This week")}>
         <ul>
           {(week ?? []).map(({ day, isToday, plans }) => (
             <li key={day.toDateString()} className="flex gap-4 px-3 py-3">
@@ -51,14 +53,14 @@ export function WeekPage() {
                 )}
               >
                 <span className="text-[11px] font-semibold uppercase">
-                  {day.toLocaleDateString("en-GB", { weekday: "short" })}
+                  {day.toLocaleDateString(dateLocale, { weekday: "short" })}
                 </span>
                 <span className="text-base font-semibold tabular-nums">{day.getDate()}</span>
               </div>
               <ul className="min-w-0 flex-1 space-y-1 pt-1">
                 {plans.map((plan) => (
                   <li key={plan} className="truncate text-[15px]">
-                    {plan}
+                    {t(plan)}
                   </li>
                 ))}
               </ul>

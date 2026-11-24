@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { appName } from "@/lib/app-name";
 import { clearPlannerData, loadLocal, saveLocal } from "@/lib/planner-storage";
+import { useI18n } from "@/components/i18n-provider";
 
 const KEY = "day-planner:settings";
 
@@ -35,6 +37,7 @@ const ROWS: { key: keyof Settings; label: string; hint: string }[] = [
 ];
 
 export function SettingsPage() {
+  const { t, locale } = useI18n();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [cleared, setCleared] = useState(false);
 
@@ -46,17 +49,17 @@ export function SettingsPage() {
   const current = settings ?? DEFAULTS;
   return (
     <>
-      <p className="eyebrow">Day Planner</p>
-      <h1 className="mt-1 text-[2rem] leading-tight font-semibold">Settings</h1>
+      <p className="eyebrow">{appName(locale).name}</p>
+      <h1 className="mt-1 text-[2rem] leading-tight font-semibold">{t("Settings")}</h1>
       <section
         className="glass mt-6 divide-y divide-[var(--hairline)] rounded-[1.75rem] px-5"
-        aria-label="Settings"
+        aria-label={t("Settings")}
       >
         {ROWS.map((row) => (
           <label key={row.key} className="flex cursor-pointer items-center gap-4 py-4">
             <span className="min-w-0 flex-1">
-              <span className="block font-medium">{row.label}</span>
-              <span className="block text-sm text-[var(--ink-2)]">{row.hint}</span>
+              <span className="block font-medium">{t(row.label)}</span>
+              <span className="block text-sm text-[var(--ink-2)]">{t(row.hint)}</span>
             </span>
             <input
               type="checkbox"
@@ -73,25 +76,25 @@ export function SettingsPage() {
         ))}
       </section>
       <section className="glass mt-4 rounded-[1.75rem] p-5">
-        <h2 className="font-medium">Your data</h2>
+        <h2 className="font-medium">{t("Your data")}</h2>
         <p className="mt-1 text-sm text-[var(--ink-2)]">
-          Your lists and notes are stored on this device only. Nothing is uploaded.
+          {t("Your lists and notes are stored on this device only. Nothing is uploaded.")}
         </p>
         <button
           type="button"
           className="btn btn-danger btn-sm mt-3"
           onClick={() => {
-            if (!window.confirm("Clear all lists, notes and settings on this device?")) return;
+            if (!window.confirm(t("Clear all lists, notes and settings on this device?"))) return;
             clearPlannerData();
             setSettings(DEFAULTS);
             setCleared(true);
           }}
         >
-          Clear all data
+          {t("Clear all data")}
         </button>
-        {cleared ? <p className="mt-2 text-sm text-[var(--ink-2)]">Cleared.</p> : null}
+        {cleared ? <p className="mt-2 text-sm text-[var(--ink-2)]">{t("Cleared.")}</p> : null}
       </section>
-      <p className="mt-6 text-center text-xs text-[var(--ink-3)]">Day Planner 2.4.1</p>
+      <p className="mt-6 text-center text-xs text-[var(--ink-3)]">{appName(locale).name} 2.4.1</p>
     </>
   );
 }

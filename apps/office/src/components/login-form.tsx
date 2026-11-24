@@ -5,8 +5,10 @@ import { signIn } from "next-auth/react";
 import { setupIdentity } from "@/lib/client-keys";
 import { clearIdentities } from "@/lib/keystore";
 import { markSessionLive } from "@/lib/live-session";
+import { useI18n } from "@/components/i18n-provider";
 
 export function LoginForm() {
+  const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<"idle" | "signing-in" | "keys">("idle");
 
@@ -27,8 +29,10 @@ export function LoginForm() {
       setStep("idle");
       setError(
         result?.code === "locked"
-          ? "Too many attempts. This account is locked. Try again in 15 minutes."
-          : "That username and password don't match. After 5 failed attempts the account pauses for 15 minutes.",
+          ? t("Too many attempts. This account is locked. Try again in 15 minutes.")
+          : t(
+              "That username and password don't match. After 5 failed attempts the account pauses for 15 minutes.",
+            ),
       );
       return;
     }
@@ -42,7 +46,7 @@ export function LoginForm() {
       window.location.replace("/");
     } catch (e) {
       setStep("idle");
-      setError(e instanceof Error ? e.message : "Couldn't prepare encryption keys.");
+      setError(t(e instanceof Error ? e.message : "Couldn't prepare encryption keys."));
     }
   }
 
@@ -50,7 +54,7 @@ export function LoginForm() {
   return (
     <form onSubmit={onSubmit} className="glass-strong space-y-3 rounded-[1.75rem] p-5">
       <label className="block space-y-1.5">
-        <span className="eyebrow">Username</span>
+        <span className="eyebrow">{t("Username")}</span>
         <input
           name="username"
           required
@@ -63,7 +67,7 @@ export function LoginForm() {
         />
       </label>
       <label className="block space-y-1.5">
-        <span className="eyebrow">Password</span>
+        <span className="eyebrow">{t("Password")}</span>
         <input
           name="password"
           type="password"
@@ -79,10 +83,10 @@ export function LoginForm() {
       ) : null}
       <button type="submit" disabled={busy} className="btn btn-primary mt-2 w-full py-3">
         {step === "signing-in"
-          ? "Signing in…"
+          ? t("Signing in…")
           : step === "keys"
-            ? "Unlocking messages…"
-            : "Sign in"}
+            ? t("Unlocking messages…")
+            : t("Sign in")}
       </button>
     </form>
   );

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Mic, Square, Video, X } from "lucide-react";
 import { MAX_CLIP_SECONDS } from "@/lib/photo";
+import { useI18n } from "@/components/i18n-provider";
 
 export interface RecordedClip {
   bytes: Uint8Array<ArrayBuffer>;
@@ -37,6 +38,7 @@ export function ClipRecorder({
   onSend: (clip: RecordedClip) => void;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const preview = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const recorder = useRef<MediaRecorder | null>(null);
@@ -69,8 +71,10 @@ export function ClipRecorder({
         if (cancelled) return;
         setError(
           kind === "video"
-            ? "Camera or microphone isn't available. Allow access in your browser or phone settings."
-            : "The microphone isn't available. Allow access in your browser or phone settings.",
+            ? t(
+                "Camera or microphone isn't available. Allow access in your browser or phone settings.",
+              )
+            : t("The microphone isn't available. Allow access in your browser or phone settings."),
         );
         setPhase("error");
       });
@@ -79,6 +83,7 @@ export function ClipRecorder({
       if (recorder.current?.state === "recording") recorder.current.stop();
       stream.current?.getTracks().forEach((t) => t.stop());
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the language never changes while open
   }, [kind]);
 
   // Countdown while recording; stop at the limit.
@@ -130,17 +135,17 @@ export function ClipRecorder({
   return (
     <div
       role="dialog"
-      aria-label={kind === "audio" ? "Record a voice note" : "Record a video"}
+      aria-label={kind === "audio" ? t("Record a voice note") : t("Record a video")}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
     >
       <section className="glass-strong rise w-full max-w-sm space-y-4 rounded-[1.75rem] p-5 text-center">
         <div className="flex items-center justify-between">
           <p className="eyebrow">
-            {kind === "audio" ? "Voice note · listen once" : "Video · view once"}
+            {kind === "audio" ? t("Voice note · listen once") : t("Video · view once")}
           </p>
           <button
             type="button"
-            aria-label="Cancel recording"
+            aria-label={t("Cancel recording")}
             onClick={onClose}
             className="grid size-9 place-items-center rounded-full hover:bg-[var(--hairline)]"
           >
@@ -165,17 +170,18 @@ export function ClipRecorder({
         )}
 
         <p className="text-sm text-[var(--ink-2)] tabular-nums" aria-live="polite">
-          {phase === "starting" && "Getting ready…"}
-          {phase === "ready" && `Up to ${MAX_CLIP_SECONDS} seconds. They can play it once.`}
-          {phase === "recording" && `Recording · ${left.toFixed(1)} s left`}
-          {phase === "done" && clip && `Recorded ${clip.duration.toFixed(1)} s`}
+          {phase === "starting" && t("Getting ready…")}
+          {phase === "ready" &&
+            t("Up to {n} seconds. They can play it once.", { n: MAX_CLIP_SECONDS })}
+          {phase === "recording" && t("Recording · {n} s left", { n: left.toFixed(1) })}
+          {phase === "done" && clip && t("Recorded {n} s", { n: clip.duration.toFixed(1) })}
           {phase === "error" && error}
         </p>
 
         <div className="flex justify-center gap-2">
           {phase === "ready" ? (
             <button type="button" onClick={start} className="btn btn-primary">
-              <Icon size={17} /> Record
+              <Icon size={17} /> {t("Record")}
             </button>
           ) : null}
           {phase === "recording" ? (
@@ -184,7 +190,7 @@ export function ClipRecorder({
               onClick={() => recorder.current?.stop()}
               className="btn btn-danger"
             >
-              <Square size={15} /> Stop
+              <Square size={15} /> {t("Stop")}
             </button>
           ) : null}
           {phase === "done" && clip ? (
@@ -197,10 +203,10 @@ export function ClipRecorder({
                 }}
                 className="btn btn-quiet"
               >
-                Record again
+                {t("Record again")}
               </button>
               <button type="button" onClick={() => onSend(clip)} className="btn btn-primary">
-                Send
+                {t("Send")}
               </button>
             </>
           ) : null}

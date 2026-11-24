@@ -56,6 +56,13 @@ setup and the encryption design.
   with that header; use made-up usernames there so real accounts don't lock.
 - One-time clips (voice/video) share the photo pipeline (`MediaType` in
   `lib/photo.ts`); they are always "once" and at most `MAX_CLIP_SECONDS`.
+- Interface text is English in the code, wrapped in `t("…")` (`useI18n()` in
+  client components, `serverT()` on the server) with `{name}` placeholders,
+  never by gluing pieces together. Every text needs a Turkish entry in
+  `src/lib/i18n-tr.ts`; a unit test finds missing ones for literal `t("…")`
+  calls, and texts reaching `t()` through a variable go in its `indirect`
+  list. Date and time labels take the `locale` argument. Turkish copy must keep
+  the cover story too (no "Office", no app name in notifications).
 - Pushing to `master` is allowed without asking (the owner's standing
   instruction). Every push deploys to Vercel immediately, so after each push
   watch the "Office checks" GitHub Actions run, and if anything fails, fix it

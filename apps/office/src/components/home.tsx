@@ -13,20 +13,24 @@ import { onlineLabel, sinceLabel, timeLabel, ttlLabel } from "@/lib/format";
 import { personPlanLabel, withDuePlan } from "@/lib/plan";
 import type { Person } from "@/lib/types";
 import { ADMIN_USERNAME } from "@/lib/constants";
+import { useI18n } from "@/components/i18n-provider";
 
 const noSubscribe = () => () => {};
 
 /** Today's date in the viewer's timezone; rendered only in the browser to avoid a hydration mismatch. */
 function Today() {
+  const { dateLocale } = useI18n();
   const today = useSyncExternalStore(
     noSubscribe,
-    () => new Date().toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" }),
+    () =>
+      new Date().toLocaleDateString(dateLocale, { weekday: "long", day: "numeric", month: "long" }),
     () => "",
   );
   return <p className="eyebrow">{today || "\u00a0"}</p>;
 }
 
 export function Home() {
+  const { t, locale } = useI18n();
   const { state, chatTitle, personById } = useApp();
   const router = useRouter();
   const [opening, setOpening] = useState<string | null>(null);
@@ -50,7 +54,7 @@ export function Home() {
   const outPeople = people.filter((p) => p.presence === "out");
   const inCount = inPeople.length;
   const admin = people.find((p) => p.username === ADMIN_USERNAME);
-  const adminPlan = admin ? personPlanLabel(admin) : null;
+  const adminPlan = admin ? personPlanLabel(admin, undefined, locale) : null;
   const showAdminBanner = admin && admin.id !== state?.me.id;
 
   return (
@@ -59,11 +63,11 @@ export function Home() {
         <div>
           <Today />
           <h1 className="mt-1 text-3xl font-semibold">
-            {state ? `Hi, ${state.me.displayName.split(" ")[0]}` : " "}
+            {state ? t("Hi, {name}", { name: state.me.displayName.split(" ")[0]! }) : " "}
           </h1>
         </div>
         <p className="text-sm text-[var(--ink-2)] tabular-nums">
-          {state ? `${inCount} of ${state.people.length} in` : ""}
+          {state ? t("{n} of {total} in", { n: inCount, total: state.people.length }) : ""}
         </p>
       </header>
 
@@ -77,17 +81,19 @@ export function Home() {
             {state.admin.securityAlerts > 0 ? (
               <span className="block font-semibold">
                 {state.admin.securityAlerts === 1
-                  ? "New security alert: failed sign-in attempts"
-                  : `${state.admin.securityAlerts} new security alerts: failed sign-in attempts`}
+                  ? t("New security alert: failed sign-in attempts")
+                  : t("{n} new security alerts: failed sign-in attempts", {
+                      n: state.admin.securityAlerts,
+                    })}
               </span>
             ) : null}
             {state.admin.loginsDisabled ? (
               <span className="block text-[var(--ink-2)]">
-                Sign-ins are disabled for everyone but you.
+                {t("Sign-ins are disabled for everyone but you.")}
               </span>
             ) : null}
           </span>
-          <span className="shrink-0 font-semibold">Review</span>
+          <span className="shrink-0 font-semibold">{t("Review")}</span>
         </Link>
       ) : null}
 
@@ -97,11 +103,11 @@ export function Home() {
           <p className="line-clamp-2 min-w-0 flex-1 text-sm leading-snug">
             <span className="font-semibold">{admin.displayName}</span>{" "}
             <span className="text-[var(--ink-2)]">
-              is {admin.presence === "in" ? "in the office" : "out"}
+              {admin.presence === "in" ? t("is in the office") : t("is out")}
               {adminPlan
                 ? ` · ${adminPlan.charAt(0).toLowerCase()}${adminPlan.slice(1)}`
                 : admin.presenceUpdatedAt
-                  ? ` · ${sinceLabel(admin.presenceUpdatedAt)}`
+                  ? ` · ${sinceLabel(admin.presenceUpdatedAt, undefined, locale)}`
                   : ""}
             </span>
           </p>
@@ -120,23 +126,23 @@ export function Home() {
           style={{ animationDelay: "60ms" }}
         >
           <PeopleGroup
-            title="In the office"
+            title={t("In the office")}
             tone="in"
             people={inPeople}
             meId={state?.me.id}
             opening={opening}
             onOpen={openDirect}
-            empty={state ? "Nobody's in right now." : ""}
+            empty={state ? t("Nobody's in right now.") : ""}
           />
           <div className="mx-3 my-1 h-px bg-[var(--hairline)]" />
           <PeopleGroup
-            title="Out"
+            title={t("Out")}
             tone="out"
             people={outPeople}
             meId={state?.me.id}
             opening={opening}
             onOpen={openDirect}
-            empty={state ? "Everyone's in." : ""}
+            empty={state ? t("Everyone's in.") : ""}
           />
         </section>
 
@@ -145,16 +151,16 @@ export function Home() {
           style={{ animationDelay: "120ms" }}
         >
           <div className="flex items-baseline justify-between px-3 pt-3 pb-2">
-            <h2 className="eyebrow">Messages</h2>
+            <h2 className="eyebrow">{t("Messages")}</h2>
             {state ? (
               <span className="text-xs text-[var(--ink-3)]">
-                Disappear after {ttlLabel(state.ttlHours)}
+                {t("Disappear after {time}", { time: ttlLabel(state.ttlHours, locale) })}
               </span>
             ) : null}
           </div>
           {state && state.chats.length === 0 ? (
             <p className="px-3 pb-4 text-sm text-[var(--ink-2)]">
-              No conversations yet. Tap someone under People to start one.
+              {t("No conversations yet. Tap someone under People to start one.")}
             </p>
           ) : null}
           <ul>
@@ -183,17 +189,19 @@ export function Home() {
                       <span className="block truncate text-[13px] text-[var(--ink-2)]">
                         {chat.kind === "group"
                           ? chat.announcement
-                            ? "Announcements"
-                            : `${chat.memberIds.length} members`
-                          : "Private"}
-                        {chat.lastMessageAt ? ` · ${timeLabel(chat.lastMessageAt)}` : ""}
+                            ? t("Announcements")
+                            : t("{n} members", { n: chat.memberIds.length })
+                          : t("Private")}
+                        {chat.lastMessageAt
+                          ? ` · ${timeLabel(chat.lastMessageAt, undefined, locale)}`
+                          : ""}
                       </span>
                     </span>
                     {chat.muted ? (
                       <BellOff
                         size={14}
                         className="shrink-0 text-[var(--ink-3)]"
-                        aria-label="Muted"
+                        aria-label={t("Muted")}
                       />
                     ) : null}
                     {chat.unread > 0 ? (
@@ -235,6 +243,7 @@ function PeopleGroup({
   onOpen: (userId: string) => void;
   empty: string;
 }) {
+  const { t, locale } = useI18n();
   // You first, then by name.
   const sorted = [...people].sort((a, b) =>
     a.id === meId ? -1 : b.id === meId ? 1 : a.displayName.localeCompare(b.displayName),
@@ -253,12 +262,14 @@ function PeopleGroup({
         {sorted.map((person) => {
           const isMe = person.id === meId;
           const office =
-            personPlanLabel(person) ??
+            personPlanLabel(person, undefined, locale) ??
             (person.presenceUpdatedAt
-              ? `Since ${timeLabel(person.presenceUpdatedAt)}`
-              : "Not set yet");
+              ? t("Since {time}", { time: timeLabel(person.presenceUpdatedAt, undefined, locale) })
+              : t("Not set yet"));
           // Your own line shows only the office status.
-          const seen = isMe ? null : onlineLabel(person.online, person.lastSeenAt);
+          const seen = isMe
+            ? null
+            : onlineLabel(person.online, person.lastSeenAt, undefined, locale);
           const detail = seen ? `${office} · ${seen}` : office;
           const content = (
             <>
@@ -270,7 +281,9 @@ function PeopleGroup({
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium">
                   {person.displayName}
-                  {isMe ? <span className="font-normal text-[var(--ink-3)]"> · You</span> : null}
+                  {isMe ? (
+                    <span className="font-normal text-[var(--ink-3)]"> · {t("You")}</span>
+                  ) : null}
                 </span>
                 <span className="block truncate text-[13px] text-[var(--ink-2)]">{detail}</span>
               </span>
@@ -304,6 +317,7 @@ function PeopleGroup({
 
 /** The next few events you're invited to (and haven't declined). */
 function UpNext({ meId }: { meId: string | undefined }) {
+  const { t, locale } = useI18n();
   const { events } = useEvents(30_000);
   const now = useNow();
   const upcoming = (events ?? [])
@@ -317,12 +331,12 @@ function UpNext({ meId }: { meId: string | undefined }) {
   return (
     <section className="glass rise rounded-[1.75rem] p-2" style={{ animationDelay: "40ms" }}>
       <div className="flex items-baseline justify-between px-3 pt-3 pb-2">
-        <h2 className="eyebrow">Up next</h2>
+        <h2 className="eyebrow">{t("Up next")}</h2>
         <Link
           href="/events"
           className="text-xs font-semibold text-[var(--ink-2)] hover:text-[var(--ink)]"
         >
-          All events
+          {t("All events")}
         </Link>
       </div>
       <ul>
@@ -338,12 +352,12 @@ function UpNext({ meId }: { meId: string | undefined }) {
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{e.title}</span>
                   <span className="block truncate text-[13px] text-[var(--ink-2)] tabular-nums">
-                    {dayHeading(start)} · {timeRange(start, e.durationMinutes)}
+                    {dayHeading(start, undefined, locale)} · {timeRange(start, e.durationMinutes)}
                   </span>
                 </span>
                 {pending ? (
                   <span className="rounded-full bg-[color-mix(in_oklab,var(--danger)_14%,transparent)] px-2 py-0.5 text-xs font-semibold text-[var(--danger)]">
-                    Reply
+                    {t("Reply")}
                   </span>
                 ) : null}
               </Link>

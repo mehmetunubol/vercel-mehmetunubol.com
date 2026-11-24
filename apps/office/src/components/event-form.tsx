@@ -7,6 +7,7 @@ import { useApp, useNow } from "@/components/app-provider";
 import { dayHeading, durationLabel, timeRange } from "@/lib/event-time";
 import { clock, toDateInput } from "@/lib/plan";
 import type { EventItem } from "@/lib/types";
+import { useI18n } from "@/components/i18n-provider";
 
 const DURATIONS = [15, 30, 45, 60, 90, 120, 180];
 const MAX_DESCRIPTION = 500;
@@ -25,6 +26,7 @@ export function EventForm({
   initialDay?: string | null;
 }) {
   const router = useRouter();
+  const { t, locale } = useI18n();
   const { state } = useApp();
   const meId = state?.me.id ?? "";
   const now = useNow();
@@ -62,13 +64,13 @@ export function EventForm({
   }, [day, time]);
 
   const problem = !title.trim()
-    ? "Give the event a title."
+    ? t("Give the event a title.")
     : !startsAt
-      ? "Pick a date and time."
+      ? t("Pick a date and time.")
       : !existing && startsAt.getTime() < now - 5 * 60_000
-        ? "That time has already passed."
+        ? t("That time has already passed.")
         : duration < 5 || duration > 24 * 60
-          ? "Duration must be between 5 minutes and 24 hours."
+          ? t("Duration must be between 5 minutes and 24 hours.")
           : null;
 
   const toggle = (id: string) =>
@@ -98,7 +100,7 @@ export function EventForm({
     const data = (await response?.json().catch(() => ({}))) as { error?: string } | undefined;
     if (!response?.ok) {
       setBusy(false);
-      return setError(data?.error ?? "Couldn't save the event.");
+      return setError(t(data?.error ?? "Couldn't save the event."));
     }
     router.push("/events");
     router.refresh();
@@ -107,7 +109,9 @@ export function EventForm({
   async function cancelEvent() {
     if (
       !existing ||
-      !window.confirm(`Cancel "${existing.title}"? Everyone invited will no longer see it.`)
+      !window.confirm(
+        t("Cancel “{title}”? Everyone invited will no longer see it.", { title: existing.title }),
+      )
     )
       return;
     setBusy(true);
@@ -116,7 +120,7 @@ export function EventForm({
     );
     if (!response?.ok) {
       setBusy(false);
-      return setError("Couldn't cancel the event.");
+      return setError(t("Couldn't cancel the event."));
     }
     router.push("/events");
     router.refresh();
@@ -125,9 +129,9 @@ export function EventForm({
   return (
     <main className="safe-top mx-auto w-full max-w-xl space-y-4 px-4 pb-32 sm:px-6">
       <header className="pt-4 pb-1">
-        <p className="eyebrow">{existing ? "Edit event" : "New event"}</p>
+        <p className="eyebrow">{existing ? t("Edit event") : t("New event")}</p>
         <h1 className="mt-1 text-3xl font-semibold">
-          {existing ? existing.title : "Plan something"}
+          {existing ? existing.title : t("Plan something")}
         </h1>
       </header>
 
@@ -140,11 +144,11 @@ export function EventForm({
       >
         <section className="glass-strong rise space-y-4 rounded-[1.75rem] p-5">
           <label className="block space-y-1.5">
-            <span className="eyebrow">Title</span>
+            <span className="eyebrow">{t("Title")}</span>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value.slice(0, 80))}
-              placeholder="Team lunch, planning session…"
+              placeholder={t("Team lunch, planning session…")}
               className="field"
               autoFocus={!existing}
             />
@@ -152,7 +156,7 @@ export function EventForm({
 
           <div className="grid grid-cols-2 gap-2">
             <label className="block space-y-1.5">
-              <span className="eyebrow">Date</span>
+              <span className="eyebrow">{t("Date")}</span>
               <input
                 type="date"
                 value={day}
@@ -162,7 +166,7 @@ export function EventForm({
               />
             </label>
             <label className="block space-y-1.5">
-              <span className="eyebrow">Starts</span>
+              <span className="eyebrow">{t("Starts")}</span>
               <input
                 type="time"
                 value={time}
@@ -173,7 +177,7 @@ export function EventForm({
           </div>
 
           <fieldset className="space-y-2">
-            <legend className="eyebrow mb-1.5">Estimated duration</legend>
+            <legend className="eyebrow mb-1.5">{t("Estimated duration")}</legend>
             <div className="flex flex-wrap gap-2">
               {DURATIONS.map((m) => (
                 <button
@@ -186,7 +190,7 @@ export function EventForm({
                   }}
                   className="chip"
                 >
-                  {durationLabel(m)}
+                  {durationLabel(m, locale)}
                 </button>
               ))}
               <button
@@ -195,7 +199,7 @@ export function EventForm({
                 onClick={() => setCustomDuration(true)}
                 className="chip"
               >
-                Other
+                {t("Other")}
               </button>
             </div>
             {customDuration ? (
@@ -208,16 +212,16 @@ export function EventForm({
                   value={duration}
                   onChange={(e) => setDuration(Number(e.target.value))}
                   className="field w-28 tabular-nums"
-                  aria-label="Duration in minutes"
+                  aria-label={t("Duration in minutes")}
                 />
-                <span className="text-sm text-[var(--ink-2)]">minutes</span>
+                <span className="text-sm text-[var(--ink-2)]">{t("minutes")}</span>
               </label>
             ) : null}
           </fieldset>
 
           {startsAt && duration >= 5 ? (
             <p className="text-sm text-[var(--ink-2)] tabular-nums">
-              {dayHeading(startsAt)} · {timeRange(startsAt, duration)}
+              {dayHeading(startsAt, new Date(), locale)} · {timeRange(startsAt, duration)}
             </p>
           ) : null}
         </section>
@@ -227,18 +231,18 @@ export function EventForm({
           style={{ animationDelay: "60ms" }}
         >
           <div className="flex items-baseline justify-between">
-            <span className="eyebrow">Description</span>
+            <span className="eyebrow">{t("Description")}</span>
             <span className="text-xs text-[var(--ink-3)] tabular-nums">
-              Optional · {description.length}/{MAX_DESCRIPTION}
+              {t("Optional")} · {description.length}/{MAX_DESCRIPTION}
             </span>
           </div>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value.slice(0, MAX_DESCRIPTION))}
             rows={3}
-            placeholder="Where, what to bring, agenda…"
+            placeholder={t("Where, what to bring, agenda…")}
             className="field resize-none"
-            aria-label="Description"
+            aria-label={t("Description")}
           />
         </section>
 
@@ -247,7 +251,9 @@ export function EventForm({
           style={{ animationDelay: "120ms" }}
         >
           <div className="flex items-baseline justify-between">
-            <span className="eyebrow">Invite · {invitees.size}</span>
+            <span className="eyebrow">
+              {t("Invite")} · {invitees.size}
+            </span>
             {others.length > 1 ? (
               <button
                 type="button"
@@ -256,12 +262,12 @@ export function EventForm({
                 }
                 className="text-xs font-semibold text-[var(--ink-2)] hover:text-[var(--ink)]"
               >
-                {allSelected ? "Clear" : "Everyone"}
+                {allSelected ? t("Clear") : t("Everyone")}
               </button>
             ) : null}
           </div>
           {others.length === 0 ? (
-            <p className="text-sm text-[var(--ink-2)]">No one else to invite yet.</p>
+            <p className="text-sm text-[var(--ink-2)]">{t("No one else to invite yet.")}</p>
           ) : null}
           <div className="flex flex-wrap gap-2">
             {others.map((p) => (
@@ -278,7 +284,7 @@ export function EventForm({
           </div>
           {existing ? (
             <p className="text-xs text-[var(--ink-3)]">
-              Changing the date, time or duration asks everyone to answer again.
+              {t("Changing the date, time or duration asks everyone to answer again.")}
             </p>
           ) : null}
         </section>
@@ -295,14 +301,14 @@ export function EventForm({
             onClick={() => router.push("/events")}
             className="btn btn-quiet flex-1"
           >
-            Back
+            {t("Back")}
           </button>
           <button
             type="submit"
             disabled={busy || !!problem}
             className={cn("btn btn-primary flex-1")}
           >
-            {busy ? "Saving…" : existing ? "Save changes" : "Create event"}
+            {busy ? t("Saving…") : existing ? t("Save changes") : t("Create event")}
           </button>
         </div>
         {problem && title ? <p className="px-1 text-xs text-[var(--ink-3)]">{problem}</p> : null}
@@ -314,7 +320,7 @@ export function EventForm({
             disabled={busy}
             className="btn btn-danger w-full"
           >
-            Cancel event
+            {t("Cancel event")}
           </button>
         ) : null}
       </form>

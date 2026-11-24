@@ -1,10 +1,12 @@
+import { dateLocale, type Locale } from "@/lib/i18n";
 import { clock, toDateInput } from "@/lib/plan";
 
-export function durationLabel(minutes: number) {
-  if (minutes < 60) return `${minutes} min`;
+export function durationLabel(minutes: number, locale: Locale = "en") {
+  const [mn, hr] = locale === "tr" ? ["dk", "sa"] : ["min", "h"];
+  if (minutes < 60) return `${minutes} ${mn}`;
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  return m ? `${h} h ${m} min` : `${h} h`;
+  return m ? `${h} ${hr} ${m} ${mn}` : `${h} ${hr}`;
 }
 
 export function endOf(startsAt: Date, durationMinutes: number) {
@@ -25,15 +27,17 @@ export function timeRange(startsAt: Date, durationMinutes: number) {
 export const dayKey = (date: Date) => toDateInput(date);
 
 /** "Today", "Tomorrow", "Yesterday", or "Wed 25 Nov" (with year if not this year). */
-export function dayHeading(date: Date, now = new Date()) {
+export function dayHeading(date: Date, now = new Date(), locale: Locale = "en") {
   const key = dayKey(date);
   const offset = (n: number) =>
     dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() + n));
-  if (key === offset(0)) return "Today";
-  if (key === offset(1)) return "Tomorrow";
-  if (key === offset(-1)) return "Yesterday";
-  const weekday = date.toLocaleDateString("en-GB", { weekday: "short" });
-  const day = date.toLocaleDateString("en-GB", {
+  const tr = locale === "tr";
+  if (key === offset(0)) return tr ? "Bugün" : "Today";
+  if (key === offset(1)) return tr ? "Yarın" : "Tomorrow";
+  if (key === offset(-1)) return tr ? "Dün" : "Yesterday";
+  const tag = dateLocale(locale);
+  const weekday = date.toLocaleDateString(tag, { weekday: "short" });
+  const day = date.toLocaleDateString(tag, {
     day: "numeric",
     month: "short",
     ...(date.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}),

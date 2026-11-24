@@ -1,17 +1,24 @@
 import type { Metadata, Viewport } from "next";
 import { ServiceWorker } from "@/components/service-worker";
+import { I18nProvider } from "@/components/i18n-provider";
+import { appName } from "@/lib/app-name";
+import { requestLocale } from "@/lib/i18n-server";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "Day Planner",
-  description: "A simple list for your day.",
-  robots: { index: false, follow: false },
-  applicationName: "Day Planner",
-  appleWebApp: { capable: true, title: "Day Planner", statusBarStyle: "black-translucent" },
-  icons: {
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
-  },
-};
+// Name and description follow the browser's language (Turkish or English).
+export async function generateMetadata(): Promise<Metadata> {
+  const { name, short, description } = appName(await requestLocale());
+  return {
+    title: name,
+    description,
+    robots: { index: false, follow: false },
+    applicationName: name,
+    appleWebApp: { capable: true, title: short, statusBarStyle: "black-translucent" },
+    icons: {
+      apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+    },
+  };
+}
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -24,11 +31,13 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  // Before sign-in the phone's language decides; signed-in pages may override it.
+  const locale = await requestLocale();
   return (
-    <html lang="en">
+    <html lang={locale}>
       <body>
-        {children}
+        <I18nProvider locale={locale}>{children}</I18nProvider>
         <ServiceWorker />
       </body>
     </html>

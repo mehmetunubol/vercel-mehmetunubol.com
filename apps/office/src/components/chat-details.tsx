@@ -5,6 +5,7 @@ import { BellOff, Clock, X } from "lucide-react";
 import { useApp } from "@/components/app-provider";
 import { ttlLabel } from "@/lib/format";
 import type { ChatSummary } from "@/lib/types";
+import { useI18n } from "@/components/i18n-provider";
 
 const LIFETIMES: { hours: number | null; label: string }[] = [
   { hours: null, label: "Default" },
@@ -33,6 +34,7 @@ export function ChatDetails({
   onClose: () => void;
 }) {
   const { state, refresh } = useApp();
+  const { t, locale } = useI18n();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canChangeLifetime = chat.kind === "direct" || state?.me.isAdmin === true;
@@ -46,7 +48,7 @@ export function ChatDetails({
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     }).catch(() => null);
-    if (!response?.ok) setError("Couldn't save that.");
+    if (!response?.ok) setError(t("Couldn't save that."));
     await refresh();
     setBusy(false);
   }
@@ -54,12 +56,12 @@ export function ChatDetails({
   return (
     <div
       role="dialog"
-      aria-label="Chat details"
+      aria-label={t("Chat details")}
       className="fixed inset-0 z-40 flex items-end justify-center sm:items-center"
     >
       <button
         type="button"
-        aria-label="Close"
+        aria-label={t("Close")}
         onClick={onClose}
         className="absolute inset-0 bg-black/30"
       />
@@ -69,9 +71,9 @@ export function ChatDetails({
             <p className="eyebrow">
               {chat.kind === "group"
                 ? chat.announcement
-                  ? "Announcements"
-                  : "Group"
-                : "Private chat"}
+                  ? t("Announcements")
+                  : t("Group")
+                : t("Private chat")}
             </p>
             <h2 className="mt-1 truncate text-xl font-semibold">{title}</h2>
             {chat.kind === "group" ? (
@@ -80,7 +82,7 @@ export function ChatDetails({
           </div>
           <button
             type="button"
-            aria-label="Close details"
+            aria-label={t("Close details")}
             onClick={onClose}
             className="grid size-9 shrink-0 place-items-center rounded-full hover:bg-[var(--hairline)]"
           >
@@ -90,9 +92,9 @@ export function ChatDetails({
 
         <div className="space-y-2">
           <h3 className="flex items-center gap-1.5 text-sm font-semibold">
-            <Clock size={15} /> Messages disappear after
+            <Clock size={15} /> {t("Messages disappear after")}
           </h3>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Message lifetime">
+          <div className="flex flex-wrap gap-2" role="group" aria-label={t("Message lifetime")}>
             {LIFETIMES.map((option) => (
               <button
                 key={option.label}
@@ -102,36 +104,38 @@ export function ChatDetails({
                 aria-pressed={chat.ttlHours === option.hours}
                 onClick={() => void save({ ttlHours: option.hours })}
               >
-                {option.hours === null ? `Default (${ttlLabel(globalHours)})` : option.label}
+                {option.hours === null
+                  ? t("Default ({time})", { time: ttlLabel(globalHours, locale) })
+                  : t(option.label)}
               </button>
             ))}
           </div>
           <p className="text-xs text-[var(--ink-3)]">
             {canChangeLifetime
-              ? "Applies to new messages, for everyone in this chat."
-              : "Only the admin can change this for a group."}
+              ? t("Applies to new messages, for everyone in this chat.")
+              : t("Only the admin can change this for a group.")}
           </p>
         </div>
 
         <div className="space-y-2">
           <h3 className="flex items-center gap-1.5 text-sm font-semibold">
-            <BellOff size={15} /> Notifications
+            <BellOff size={15} /> {t("Notifications")}
           </h3>
           {chat.muted ? (
             <div className="flex items-center gap-3">
-              <span className="text-sm text-[var(--ink-2)]">Muted</span>
+              <span className="text-sm text-[var(--ink-2)]">{t("Muted")}</span>
               <button
                 type="button"
                 className="btn btn-quiet btn-sm"
                 disabled={busy}
                 onClick={() => void save({ mute: "off" })}
               >
-                Unmute
+                {t("Unmute")}
               </button>
             </div>
           ) : (
-            <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Mute">
-              <span className="text-sm text-[var(--ink-2)]">Mute for</span>
+            <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t("Mute")}>
+              <span className="text-sm text-[var(--ink-2)]">{t("Mute for")}</span>
               {MUTES.map((option) => (
                 <button
                   key={option.value}
@@ -140,13 +144,13 @@ export function ChatDetails({
                   disabled={busy}
                   onClick={() => void save({ mute: option.value })}
                 >
-                  {option.label}
+                  {t(option.label)}
                 </button>
               ))}
             </div>
           )}
           <p className="text-xs text-[var(--ink-3)]">
-            Only affects you. Muted chats never send a notification.
+            {t("Only affects you. Muted chats never send a notification.")}
           </p>
         </div>
 

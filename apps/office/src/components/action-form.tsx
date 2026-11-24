@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import { cn } from "@repo/ui";
 import type { ActionResult } from "@/app/(app)/admin/actions";
+import { useI18n } from "@/components/i18n-provider";
 
 function Submit({
   label,
@@ -15,9 +16,10 @@ function Submit({
   className?: string;
 }) {
   const { pending } = useFormStatus();
+  const { t } = useI18n();
   return (
     <button type="submit" disabled={pending} className={cn("btn", className)}>
-      {pending ? (pendingLabel ?? "Saving…") : label}
+      {pending ? (pendingLabel ?? t("Saving…")) : label}
     </button>
   );
 }
@@ -42,6 +44,7 @@ export function ActionForm({
   resetOnSuccess?: boolean;
 }) {
   const [state, formAction] = useActionState(action, null);
+  const { t } = useI18n();
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -65,7 +68,7 @@ export function ActionForm({
             role="status"
             className={cn("text-xs", state.ok ? "text-[var(--ink-2)]" : "text-[var(--danger)]")}
           >
-            {state.message}
+            {state.message ? t(state.message, state.vars) : null}
           </p>
         ) : null}
       </div>

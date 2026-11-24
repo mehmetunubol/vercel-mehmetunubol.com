@@ -37,6 +37,7 @@ export interface AppState {
     publicKey: string | null;
     hideOnline: boolean;
     autoLockMinutes: number;
+    locale: "en" | "tr" | null;
   };
   people: Person[];
   chats: ChatSummary[];

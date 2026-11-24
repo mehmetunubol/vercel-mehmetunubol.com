@@ -1,6 +1,9 @@
 // Service worker: makes the app installable and keeps static assets
 // fast. API responses and pages are never cached (they're private and live).
-const STATIC_CACHE = "static-v3";
+const STATIC_CACHE = "static-v4";
+
+// Follows the phone's language (the account setting isn't visible here).
+const TURKISH = (self.navigator.language || "").toLowerCase().startsWith("tr");
 
 self.addEventListener("install", () => self.skipWaiting());
 
@@ -13,11 +16,15 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+const OFFLINE_TEXT = TURKISH
+  ? ["Günlük Planlayıcı", "Çevrimdışısınız", "Tekrar bağlandığınızda listeniz burada olacak."]
+  : ["Day Planner", "You're offline", "Your list will be here when you're back online."];
+
 const OFFLINE_HTML = `<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Day Planner</title><body style="margin:0;min-height:100vh;display:grid;place-items:center;
+<title>${OFFLINE_TEXT[0]}</title><body style="margin:0;min-height:100vh;display:grid;place-items:center;
 font:16px -apple-system,system-ui,sans-serif;background:#121315;color:#f2eee6">
-<div style="text-align:center;padding:24px"><p style="font-weight:600;margin:0 0 6px">You're offline</p>
-<p style="opacity:.6;margin:0">Your list will be here when you're back online.</p></div>`;
+<div style="text-align:center;padding:24px"><p style="font-weight:600;margin:0 0 6px">${OFFLINE_TEXT[1]}</p>
+<p style="opacity:.6;margin:0">${OFFLINE_TEXT[2]}</p></div>`;
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
@@ -50,7 +57,7 @@ self.addEventListener("fetch", (event) => {
 // Push "nudges" arrive with no payload. Show a random, generic line that says
 // nothing about the app, the sender or the content.
 // Lines a day-planner app would plausibly send.
-const NUDGES = [
+const NUDGES_EN = [
   ["Reminder", "Don't forget to check your list today."],
   ["Today", "You have something on your list."],
   ["Reminder", "Take a short break and stretch."],
@@ -60,6 +67,19 @@ const NUDGES = [
   ["Planner", "Your list is up to date."],
   ["Today", "Small steps count. Tick one thing off."],
 ];
+
+const NUDGES_TR = [
+  ["Hatırlatma", "Bugün listene göz atmayı unutma."],
+  ["Bugün", "Listende bir şey var."],
+  ["Hatırlatma", "Kısa bir mola ver ve biraz esne."],
+  ["Planlayıcı", "Haftalık özetin hazır."],
+  ["Bugün", "Günün geri kalanını planlamak için iyi bir zaman."],
+  ["Hatırlatma", "Bir bardak su iç."],
+  ["Planlayıcı", "Listen güncel."],
+  ["Bugün", "Küçük adımlar da sayılır. Bir şeyi tamamla."],
+];
+
+const NUDGES = TURKISH ? NUDGES_TR : NUDGES_EN;
 
 self.addEventListener("push", (event) => {
   const [title, body] = NUDGES[Math.floor(Math.random() * NUDGES.length)];

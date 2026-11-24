@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { signIn, signOut } from "next-auth/react";
-import { LockKeyhole, LogOut, Timer } from "lucide-react";
+import { Languages, LockKeyhole, LogOut, Timer } from "lucide-react";
 import { useApp } from "@/components/app-provider";
 import { Avatar } from "@/components/avatar";
 import { NotificationsCard } from "@/components/notifications-card";
@@ -11,9 +11,11 @@ import { clearIdentities } from "@/lib/keystore";
 import { clearSessionLive } from "@/lib/live-session";
 import { MIN_PASSWORD_LENGTH } from "@/lib/constants";
 import { AUTO_LOCK_CHOICES } from "@/lib/hide";
+import { useI18n } from "@/components/i18n-provider";
 
 export function AccountView() {
   const { state } = useApp();
+  const { t } = useI18n();
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -24,11 +26,14 @@ export function AccountView() {
     const currentPassword = String(form.get("current") ?? "");
     const newPassword = String(form.get("next") ?? "");
     if (newPassword !== String(form.get("confirm") ?? "")) {
-      setMessage({ ok: false, text: "The new passwords don't match." });
+      setMessage({ ok: false, text: t("The new passwords don't match.") });
       return;
     }
     if (newPassword.length < MIN_PASSWORD_LENGTH) {
-      setMessage({ ok: false, text: `Use at least ${MIN_PASSWORD_LENGTH} characters.` });
+      setMessage({
+        ok: false,
+        text: t("Use at least {n} characters.", { n: MIN_PASSWORD_LENGTH }),
+      });
       return;
     }
     setBusy(true);
@@ -46,7 +51,7 @@ export function AccountView() {
             newPassword,
           );
         } catch {
-          throw new Error("Current password is incorrect.");
+          throw new Error(t("Current password is incorrect."));
         }
       }
       const response = await fetch("/api/me/password", {
@@ -55,7 +60,7 @@ export function AccountView() {
         body: JSON.stringify({ currentPassword, newPassword, encryptedPrivateKey }),
       });
       const body = (await response.json().catch(() => ({}))) as { error?: string };
-      if (!response.ok) throw new Error(body.error ?? "Couldn't change your password.");
+      if (!response.ok) throw new Error(t(body.error ?? "Couldn't change your password."));
       // Other sessions were revoked; sign this one back in with the new password.
       await signIn("credentials", {
         username: state?.me.username,
@@ -63,9 +68,9 @@ export function AccountView() {
         redirect: false,
       });
       formEl.reset();
-      setMessage({ ok: true, text: "Password changed. Other devices have been signed out." });
+      setMessage({ ok: true, text: t("Password changed. Other devices have been signed out.") });
     } catch (e) {
-      setMessage({ ok: false, text: e instanceof Error ? e.message : "Something went wrong." });
+      setMessage({ ok: false, text: e instanceof Error ? e.message : t("Something went wrong.") });
     } finally {
       setBusy(false);
     }
@@ -80,8 +85,8 @@ export function AccountView() {
   return (
     <main className="safe-top mx-auto w-full max-w-lg space-y-4 px-4 pb-32 sm:px-6">
       <header className="pt-4 pb-1">
-        <p className="eyebrow">Account</p>
-        <h1 className="mt-1 text-3xl font-semibold">You</h1>
+        <p className="eyebrow">{t("Account")}</p>
+        <h1 className="mt-1 text-3xl font-semibold">{t("You")}</h1>
       </header>
 
       <section className="glass-strong rise flex items-center gap-4 rounded-[1.75rem] p-5">
@@ -97,13 +102,13 @@ export function AccountView() {
         className="glass rise space-y-3 rounded-[1.75rem] p-5"
         style={{ animationDelay: "60ms" }}
       >
-        <h2 className="eyebrow">Change password</h2>
+        <h2 className="eyebrow">{t("Change password")}</h2>
         <input
           name="current"
           type="password"
           required
           autoComplete="current-password"
-          placeholder="Current password"
+          placeholder={t("Current password")}
           className="field"
         />
         <input
@@ -111,7 +116,7 @@ export function AccountView() {
           type="password"
           required
           autoComplete="new-password"
-          placeholder="New password"
+          placeholder={t("New password")}
           className="field"
         />
         <input
@@ -119,7 +124,7 @@ export function AccountView() {
           type="password"
           required
           autoComplete="new-password"
-          placeholder="Repeat new password"
+          placeholder={t("Repeat new password")}
           className="field"
         />
         {message ? (
@@ -131,7 +136,7 @@ export function AccountView() {
           </p>
         ) : null}
         <button type="submit" disabled={busy} className="btn btn-primary">
-          {busy ? "Changing…" : "Change password"}
+          {busy ? t("Changing…") : t("Change password")}
         </button>
       </form>
 
@@ -139,23 +144,25 @@ export function AccountView() {
 
       <AutoLockCard />
 
+      <LanguageCard />
+
       <section
         className="glass rise space-y-3 rounded-[1.75rem] p-5"
         style={{ animationDelay: "120ms" }}
       >
         <h2 className="eyebrow flex items-center gap-1.5">
-          <LockKeyhole size={12} /> Privacy
+          <LockKeyhole size={12} /> {t("Privacy")}
         </h2>
         <p className="text-sm leading-relaxed text-[var(--ink-2)]">
-          Messages are encrypted on your device before they&rsquo;re sent and can only be read by
-          the people in the conversation. Your key is protected by your password. If an admin resets
-          your password, earlier messages to you can no longer be read.
+          {t(
+            "Messages are encrypted on your device before they’re sent and can only be read by the people in the conversation. Your key is protected by your password. If an admin resets your password, earlier messages to you can no longer be read.",
+          )}
         </p>
         <OnlineStatusToggle />
       </section>
 
       <button type="button" onClick={logOut} className="btn btn-quiet w-full py-3">
-        <LogOut size={18} /> Sign out
+        <LogOut size={18} /> {t("Sign out")}
       </button>
     </main>
   );
@@ -164,6 +171,7 @@ export function AccountView() {
 /** "Show when I'm online": reciprocal, so hiding yours hides everyone else's from you. */
 function OnlineStatusToggle() {
   const { state, refresh } = useApp();
+  const { t } = useI18n();
   const [saving, setSaving] = useState(false);
   // Flip the switch immediately; the server's answer replaces it after refresh.
   const [optimistic, setOptimistic] = useState<boolean | null>(null);
@@ -194,10 +202,11 @@ function OnlineStatusToggle() {
         className="mt-0.5 size-4 accent-[var(--ink)]"
       />
       <span>
-        <span className="block text-sm font-medium">Show when I&rsquo;m online</span>
+        <span className="block text-sm font-medium">{t("Show when I’m online")}</span>
         <span className="block text-xs text-[var(--ink-2)]">
-          Others see when you have the app open, when you were last seen, and when you&rsquo;re
-          typing. If you turn this off, you won&rsquo;t see theirs either.
+          {t(
+            "Others see when you have the app open, when you were last seen, and when you’re typing. If you turn this off, you won’t see theirs either.",
+          )}
         </span>
       </span>
     </label>
@@ -207,6 +216,7 @@ function OnlineStatusToggle() {
 /** How long the app may sit untouched before it locks back to the Day Planner. */
 function AutoLockCard() {
   const { state, refresh } = useApp();
+  const { t } = useI18n();
   const [pending, setPending] = useState<number | null>(null);
   if (!state) return null;
   const current = pending ?? state.me.autoLockMinutes;
@@ -228,13 +238,14 @@ function AutoLockCard() {
       style={{ animationDelay: "100ms" }}
     >
       <h2 className="eyebrow flex items-center gap-1.5">
-        <Timer size={12} /> Auto-lock
+        <Timer size={12} /> {t("Auto-lock")}
       </h2>
       <p className="text-sm text-[var(--ink-2)]">
-        If you don&rsquo;t touch the app for this long, it locks and shows the planner again. Time
-        with the app in the background counts too. To hide it at once, use the eye button.
+        {t(
+          "If you don’t touch the app for this long, it locks and shows the planner again. Time with the app in the background counts too. To hide it at once, use the eye button.",
+        )}
       </p>
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Auto-lock after">
+      <div className="flex flex-wrap gap-2" role="group" aria-label={t("Auto-lock after")}>
         {AUTO_LOCK_CHOICES.map((minutes) => (
           <button
             key={minutes}
@@ -243,10 +254,63 @@ function AutoLockCard() {
             aria-pressed={current === minutes}
             onClick={() => void choose(minutes)}
           >
-            {minutes} min
+            {t("{n} min", { n: minutes })}
           </button>
         ))}
       </div>
+    </section>
+  );
+}
+
+const LANGUAGES = [
+  { value: null, label: "Automatic" },
+  { value: "en", label: "English" },
+  { value: "tr", label: "Türkçe" },
+] as const;
+
+/** Interface language: the phone's language unless chosen here. */
+function LanguageCard() {
+  const { state } = useApp();
+  const { t } = useI18n();
+  const [pending, setPending] = useState<"en" | "tr" | null | undefined>(undefined);
+  if (!state) return null;
+  const current = pending === undefined ? state.me.locale : pending;
+
+  async function choose(locale: "en" | "tr" | null) {
+    setPending(locale);
+    const response = await fetch("/api/me/settings", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ locale }),
+    }).catch(() => null);
+    // Every screen (and the server-rendered parts) picks the language up on reload.
+    if (response?.ok) window.location.reload();
+    else setPending(undefined);
+  }
+
+  return (
+    <section
+      className="glass rise space-y-3 rounded-[1.75rem] p-5"
+      style={{ animationDelay: "110ms" }}
+    >
+      <h2 className="eyebrow flex items-center gap-1.5">
+        <Languages size={12} /> {t("Language")}
+      </h2>
+      <div className="flex flex-wrap gap-2" role="group" aria-label={t("Language")}>
+        {LANGUAGES.map((option) => (
+          <button
+            key={option.label}
+            type="button"
+            className="chip"
+            aria-pressed={current === option.value}
+            disabled={pending !== undefined}
+            onClick={() => void choose(option.value)}
+          >
+            {option.value === null ? t(option.label) : option.label}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-[var(--ink-3)]">{t("Automatic follows your phone’s language.")}</p>
     </section>
   );
 }

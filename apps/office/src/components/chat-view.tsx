@@ -48,6 +48,8 @@ import { onlineLabel, timeLabel, ttlLabel } from "@/lib/format";
 import { personPlanLabel, withDuePlan } from "@/lib/plan";
 import { ADMIN_USERNAME, MAX_MESSAGE_CHARS } from "@/lib/constants";
 import type { Presence } from "@/lib/types";
+import { useI18n } from "@/components/i18n-provider";
+import type { Vars } from "@/lib/i18n";
 
 interface Member {
   id: string;
@@ -120,24 +122,25 @@ interface Item {
 }
 
 /** First line of a message, shortened, for reply quotes. */
-function snippet(body: Body | undefined) {
+function snippet(body: Body | undefined, t: (text: string, vars?: Vars) => string) {
   if (body?.kind === "photo") {
     const label =
       body.photo.media === "audio"
-        ? "Voice note"
+        ? t("Voice note")
         : body.photo.media === "video"
-          ? "One-time video"
+          ? t("One-time video")
           : body.photo.kind === "once"
-            ? "One-time photo"
-            : "Photo";
+            ? t("One-time photo")
+            : t("Photo");
     return body.photo.caption ? `${label} · ${body.photo.caption}` : label;
   }
-  if (!body || body.kind !== "text") return "Message";
+  if (!body || body.kind !== "text") return t("Message");
   const line = body.text.split("\n")[0]!.trim();
   return line.length > 80 ? `${line.slice(0, 80)}…` : line;
 }
 
 export function ChatView({ conversationId }: { conversationId: string }) {
+  const { t, locale } = useI18n();
   const { state, identity, identityStatus, refresh, personById } = useApp();
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [missing, setMissing] = useState(false);
@@ -344,19 +347,21 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   const other = conversation?.kind === "direct" ? members.find((m) => m.id !== meId) : undefined;
   const title = conversation
     ? conversation.kind === "group"
-      ? (conversation.name ?? "Group")
-      : (other?.displayName ?? "Private chat")
+      ? (conversation.name ?? t("Group"))
+      : (other?.displayName ?? t("Private chat"))
     : "";
   // Live presence (and any scheduled change) comes from the polled app state.
   const otherLive = other ? personById(other.id) : undefined;
   const otherStatus = otherLive ? withDuePlan(otherLive) : undefined;
-  const otherPlan = otherStatus ? personPlanLabel(otherStatus) : null;
-  const otherOnline = otherStatus ? onlineLabel(otherStatus.online, otherStatus.lastSeenAt) : null;
+  const otherPlan = otherStatus ? personPlanLabel(otherStatus, new Date(), locale) : null;
+  const otherOnline = otherStatus
+    ? onlineLabel(otherStatus.online, otherStatus.lastSeenAt, new Date(), locale)
+    : null;
   const withoutKeys = members.filter((m) => !m.publicKey && m.id !== meId);
   const isAnnouncement = conversation?.announcement ?? false;
   const canPost = !isAnnouncement || state?.me.isAdmin === true;
   const adminName =
-    state?.people.find((p) => p.username === ADMIN_USERNAME)?.displayName ?? "the admin";
+    state?.people.find((p) => p.username === ADMIN_USERNAME)?.displayName ?? t("the admin");
 
   const reactionsByMessage = useMemo(() => {
     const map = new Map<string, { up: string[]; down: string[]; mine: Reaction | null }>();
@@ -384,7 +389,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
     [reads],
   );
 
-  const nameOf = (userId: string) => memberById.get(userId)?.displayName ?? "Former member";
+  const nameOf = (userId: string) => memberById.get(userId)?.displayName ?? t("Former member");
 
   async function react(messageId: string, reaction: Reaction) {
     if (!meId) return;
@@ -462,12 +467,12 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       if (!response.ok) throw new Error();
     } catch {
       setItems((prev) => new Map(prev).set(id, before));
-      setNotice("Couldn't save the edit.");
+      setNotice(t("Couldn't save the edit."));
     }
   }
 
   async function deleteMessage(id: string) {
-    if (!conversation || !window.confirm("Delete this message for everyone?")) return;
+    if (!conversation || !window.confirm(t("Delete this message for everyone?"))) return;
     setSelectedId(null);
     const before = items.get(id);
     setItems((prev) => {
@@ -482,7 +487,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       wire.current.delete(id);
     } else if (before) {
       setItems((prev) => new Map(prev).set(id, before));
-      setNotice("Couldn't delete the message.");
+      setNotice(t("Couldn't delete the message."));
     }
   }
 
@@ -496,7 +501,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       setEditing(null);
       composer.current?.focus();
     } catch {
-      setNotice("Couldn't read that photo.");
+      setNotice(t("Couldn't read that photo."));
     }
   }
 
@@ -616,7 +621,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       if (kind === "once" && url) URL.revokeObjectURL(url);
     } catch (error) {
       setItems((prev) => new Map(prev).set(id, { ...optimistic, sending: false, error: true }));
-      setNotice(error instanceof Error ? error.message : "Couldn't send it.");
+      setNotice(t(error instanceof Error ? error.message : "Couldn't send it."));
     }
   }
 
@@ -667,9 +672,9 @@ export function ChatView({ conversationId }: { conversationId: string }) {
     return (
       <main className="grid min-h-dvh place-items-center px-6 text-center">
         <div>
-          <p className="font-semibold">This conversation isn&rsquo;t available.</p>
+          <p className="font-semibold">{t("This conversation isn’t available.")}</p>
           <Link href="/" className="btn btn-quiet mt-4">
-            Back
+            {t("Back")}
           </Link>
         </div>
       </main>
@@ -682,7 +687,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         <div className="glass-strong mx-auto flex max-w-3xl items-center gap-3 rounded-full py-1.5 pr-4 pl-1.5">
           <Link
             href="/"
-            aria-label="Back"
+            aria-label={t("Back")}
             className="grid size-10 place-items-center rounded-full hover:bg-[var(--hairline)]"
           >
             <ChevronLeft size={22} />
@@ -702,20 +707,20 @@ export function ChatView({ conversationId }: { conversationId: string }) {
           <button
             type="button"
             onClick={() => setDetailsOpen(true)}
-            aria-label="Chat details"
+            aria-label={t("Chat details")}
             className="min-w-0 flex-1 text-left"
           >
             <p className="truncate leading-tight font-semibold">{title || " "}</p>
             <p className="truncate text-xs text-[var(--ink-2)]">
               {conversation?.kind === "direct" && typing.length > 0
-                ? "typing…"
+                ? t("typing…")
                 : conversation?.kind === "group"
                   ? isAnnouncement
-                    ? `Announcements · ${members.length} members`
+                    ? t("Announcements · {n} members", { n: members.length })
                     : members.map((m) => m.displayName.split(" ")[0]).join(", ")
                   : otherStatus
                     ? [
-                        otherStatus.presence === "in" ? "In the office" : "Out of the office",
+                        otherStatus.presence === "in" ? t("In the office") : t("Out of the office"),
                         otherPlan
                           ? `${otherPlan.charAt(0).toLowerCase()}${otherPlan.slice(1)}`
                           : null,
@@ -727,13 +732,13 @@ export function ChatView({ conversationId }: { conversationId: string }) {
             </p>
           </button>
           {chatSummary?.muted ? (
-            <BellOff size={15} className="shrink-0 text-[var(--ink-3)]" aria-label="Muted" />
+            <BellOff size={15} className="shrink-0 text-[var(--ink-3)]" aria-label={t("Muted")} />
           ) : null}
           <button
             type="button"
             onClick={hideNow}
-            aria-label="Hide now"
-            title="Hide now"
+            aria-label={t("Hide now")}
+            title={t("Hide now")}
             className="-mr-2 grid size-10 shrink-0 place-items-center rounded-full text-[var(--ink-2)] hover:bg-[var(--hairline)]"
           >
             <EyeOff size={18} />
@@ -751,8 +756,10 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       >
         <div className="mx-auto flex max-w-3xl flex-col gap-1">
           <p className="mx-auto mb-4 flex items-center gap-1.5 rounded-full px-3 py-1 text-center text-xs text-[var(--ink-3)]">
-            <LockKeyhole size={12} /> End-to-end encrypted · disappears after{" "}
-            {ttlLabel(effectiveTtl)}
+            <LockKeyhole size={12} />{" "}
+            {t("End-to-end encrypted · disappears after {time}", {
+              time: ttlLabel(effectiveTtl, locale),
+            })}
           </p>
 
           {identityStatus === "locked" ? <UnlockCard /> : null}
@@ -780,7 +787,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                 >
                   {conversation?.kind === "group" && !mine && firstOfRun ? (
                     <span className="mb-0.5 px-3 text-xs text-[var(--ink-2)]">
-                      {sender?.displayName ?? "Former member"}
+                      {sender?.displayName ?? t("Former member")}
                     </span>
                   ) : null}
                   {/* Not a <button>, so the text stays selectable for copying. */}
@@ -826,16 +833,16 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                           <>
                             <span className="block font-semibold">
                               {items.get(item.replyToId)!.senderId === meId
-                                ? "You"
+                                ? t("You")
                                 : nameOf(items.get(item.replyToId)!.senderId)}
                             </span>
                             <span className="line-clamp-2 opacity-80">
-                              {snippet(items.get(item.replyToId)!.body)}
+                              {snippet(items.get(item.replyToId)!.body, t)}
                             </span>
                           </>
                         ) : (
                           <span className="italic opacity-70">
-                            Original message is no longer available
+                            {t("Original message is no longer available")}
                           </span>
                         )}
                       </button>
@@ -856,8 +863,8 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                     ) : (
                       <span className="text-[var(--ink-2)] italic">
                         {item.body.kind === "no-key"
-                          ? "Sent before you joined, or before your key was set up."
-                          : "Can't decrypt this message (the key changed)."}
+                          ? t("Sent before you joined, or before your key was set up.")
+                          : t("Can't decrypt this message (the key changed).")}
                       </span>
                     )}
                   </div>
@@ -892,7 +899,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                         <button
                           key={kind}
                           type="button"
-                          aria-label={kind === "up" ? "Thumbs up" : "Thumbs down"}
+                          aria-label={kind === "up" ? t("Thumbs up") : t("Thumbs down")}
                           aria-pressed={counts?.mine === kind}
                           onClick={() => void react(item.id, kind)}
                           className={cn(
@@ -908,7 +915,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                       {canPost ? (
                         <button
                           type="button"
-                          aria-label="Reply"
+                          aria-label={t("Reply")}
                           onClick={() => startReply(item.id)}
                           className="grid size-9 place-items-center rounded-full hover:bg-[var(--hairline)]"
                         >
@@ -921,12 +928,14 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                   {selected && mine && !item.sending && !item.error ? (
                     <div className="glass-strong rise mt-1 max-w-[82%] space-y-0.5 rounded-2xl px-3 py-2 text-xs">
                       <p>
-                        <span className="text-[var(--ink-3)]">Read by </span>
-                        {receipts.read.length ? receipts.read.map(nameOf).join(", ") : "nobody yet"}
+                        <span className="text-[var(--ink-3)]">{t("Read by")} </span>
+                        {receipts.read.length
+                          ? receipts.read.map(nameOf).join(", ")
+                          : t("nobody yet")}
                       </p>
                       {receipts.unread.length ? (
                         <p>
-                          <span className="text-[var(--ink-3)]">Not yet </span>
+                          <span className="text-[var(--ink-3)]">{t("Not yet")} </span>
                           {receipts.unread.map(nameOf).join(", ")}
                         </p>
                       ) : null}
@@ -940,7 +949,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                         onClick={() => startReply(item.id)}
                         className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold hover:bg-[var(--hairline)]"
                       >
-                        <Reply size={14} /> Reply
+                        <Reply size={14} /> {t("Reply")}
                       </button>
                       {item.body.kind === "text" ? (
                         <button
@@ -948,7 +957,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                           onClick={() => startEdit(item)}
                           className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold hover:bg-[var(--hairline)]"
                         >
-                          <Pencil size={14} /> Edit
+                          <Pencil size={14} /> {t("Edit")}
                         </button>
                       ) : null}
                       <button
@@ -956,7 +965,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                         onClick={() => void deleteMessage(item.id)}
                         className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-[var(--danger)] hover:bg-[var(--hairline)]"
                       >
-                        <Trash2 size={14} /> Delete
+                        <Trash2 size={14} /> {t("Delete")}
                       </button>
                     </div>
                   ) : null}
@@ -969,13 +978,13 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                       )}
                     >
                       {item.error ? (
-                        "Not sent"
+                        t("Not sent")
                       ) : item.sending ? (
-                        "Sending…"
+                        t("Sending…")
                       ) : (
                         <>
-                          {timeLabel(item.createdAt)}
-                          {item.editedAt ? <span>· edited</span> : null}
+                          {timeLabel(item.createdAt, new Date(), locale)}
+                          {item.editedAt ? <span>· {t("edited")}</span> : null}
                           {mine ? (
                             <ReceiptLabel
                               receipts={receipts}
@@ -1004,20 +1013,26 @@ export function ChatView({ conversationId }: { conversationId: string }) {
               <span />
             </span>
             {typing.length === 1
-              ? `${nameOf(typing[0]!)} is typing…`
-              : `${typing.map((id) => nameOf(id).split(" ")[0]).join(" and ")} are typing…`}
+              ? t("{name} is typing…", { name: nameOf(typing[0]!) })
+              : t("{names} are typing…", {
+                  names: typing.map((id) => nameOf(id).split(" ")[0]).join(t(" and ")),
+                })}
           </p>
         ) : null}
         {withoutKeys.length > 0 && identityStatus === "ready" ? (
           <p className="mx-auto mb-2 max-w-3xl px-2 text-xs text-[var(--ink-2)]">
-            {withoutKeys.map((m) => m.displayName).join(", ")}{" "}
-            {withoutKeys.length === 1 ? "hasn't" : "haven't"} signed in yet and won&rsquo;t be able
-            to read new messages.
+            {t(
+              withoutKeys.length === 1
+                ? "{names} hasn't signed in yet and won’t be able to read new messages."
+                : "{names} haven't signed in yet and won’t be able to read new messages.",
+              { names: withoutKeys.map((m) => m.displayName).join(", ") },
+            )}
           </p>
         ) : null}
         {!canPost ? (
           <p className="glass mx-auto flex max-w-3xl items-center justify-center gap-2 rounded-[1.6rem] px-4 py-3.5 text-sm text-[var(--ink-2)]">
-            <Megaphone size={16} /> Only {adminName} can post here. Tap a message to react.
+            <Megaphone size={16} />{" "}
+            {t("Only {admin} can post here. Tap a message to react.", { admin: adminName })}
           </p>
         ) : (
           <>
@@ -1041,7 +1056,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                   className="flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-xs font-semibold hover:bg-[var(--hairline)]"
                 >
                   <ImagePlus size={20} />
-                  Photo
+                  {t("Photo")}
                 </button>
                 <button
                   type="button"
@@ -1053,7 +1068,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                   className="flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-xs font-semibold hover:bg-[var(--hairline)]"
                 >
                   <Mic size={20} />
-                  Voice note · 5 s
+                  {t("Voice note · 5 s")}
                 </button>
                 <button
                   type="button"
@@ -1065,7 +1080,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                   className="flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-xs font-semibold hover:bg-[var(--hairline)]"
                 >
                   <Video size={20} />
-                  Video · 5 s
+                  {t("Video · 5 s")}
                 </button>
               </div>
             ) : null}
@@ -1077,13 +1092,13 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                   alt=""
                   className="size-12 shrink-0 rounded-lg object-cover"
                 />
-                <div className="seg min-w-0 flex-1" role="group" aria-label="Photo type">
+                <div className="seg min-w-0 flex-1" role="group" aria-label={t("Photo type")}>
                   <button
                     type="button"
                     aria-pressed={pendingPhoto.kind === "once"}
                     onClick={() => setPendingPhoto({ ...pendingPhoto, kind: "once" })}
                   >
-                    View once
+                    {t("View once")}
                   </button>
                   {state?.photosAllowed ? (
                     <button
@@ -1091,13 +1106,13 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                       aria-pressed={pendingPhoto.kind === "normal"}
                       onClick={() => setPendingPhoto({ ...pendingPhoto, kind: "normal" })}
                     >
-                      Keep in chat
+                      {t("Keep in chat")}
                     </button>
                   ) : null}
                 </div>
                 <button
                   type="button"
-                  aria-label="Remove photo"
+                  aria-label={t("Remove photo")}
                   onClick={dropPhoto}
                   className="grid size-8 shrink-0 place-items-center rounded-full hover:bg-[var(--hairline)]"
                 >
@@ -1114,25 +1129,27 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                 )}
                 <span className="min-w-0 flex-1 truncate">
                   {editing ? (
-                    <span className="font-semibold">Editing your message</span>
+                    <span className="font-semibold">{t("Editing your message")}</span>
                   ) : (
                     <>
                       <span className="font-semibold">
-                        Replying to{" "}
-                        {items.get(replyTo!)?.senderId === meId
-                          ? "yourself"
-                          : nameOf(items.get(replyTo!)?.senderId ?? "")}
+                        {t("Replying to {name}", {
+                          name:
+                            items.get(replyTo!)?.senderId === meId
+                              ? t("yourself")
+                              : nameOf(items.get(replyTo!)?.senderId ?? ""),
+                        })}
                       </span>
                       <span className="text-[var(--ink-2)]">
                         {" "}
-                        · {snippet(items.get(replyTo!)?.body)}
+                        · {snippet(items.get(replyTo!)?.body, t)}
                       </span>
                     </>
                   )}
                 </span>
                 <button
                   type="button"
-                  aria-label={editing ? "Cancel editing" : "Cancel reply"}
+                  aria-label={editing ? t("Cancel editing") : t("Cancel reply")}
                   onClick={cancelCompose}
                   className="grid size-8 shrink-0 place-items-center rounded-full hover:bg-[var(--hairline)]"
                 >
@@ -1154,7 +1171,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    aria-label="Choose a photo"
+                    aria-label={t("Choose a photo")}
                     onChange={(e) => {
                       void pickPhoto(e.target.files?.[0]);
                       e.target.value = "";
@@ -1162,7 +1179,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                   />
                   <button
                     type="button"
-                    aria-label="Attach"
+                    aria-label={t("Attach")}
                     aria-expanded={attachMenu}
                     disabled={identityStatus !== "ready"}
                     onClick={() => setAttachMenu((open) => !open)}
@@ -1208,18 +1225,18 @@ export function ChatView({ conversationId }: { conversationId: string }) {
                 rows={1}
                 placeholder={
                   identityStatus !== "ready"
-                    ? "Unlock to send messages"
+                    ? t("Unlock to send messages")
                     : pendingPhoto
-                      ? "Add a caption"
-                      : "Message"
+                      ? t("Add a caption")
+                      : t("Message")
                 }
                 disabled={identityStatus !== "ready"}
-                aria-label="Message"
+                aria-label={t("Message")}
                 className="field-sizing-content max-h-40 min-h-10 flex-1 resize-none bg-transparent py-2 text-base outline-none placeholder:text-[var(--ink-3)]"
               />
               <button
                 type="submit"
-                aria-label={editing ? "Save edit" : "Send"}
+                aria-label={editing ? t("Save edit") : t("Send")}
                 disabled={(!draft.trim() && !pendingPhoto) || identityStatus !== "ready"}
                 className="btn btn-primary size-10 shrink-0 p-0"
               >
@@ -1292,6 +1309,7 @@ function PhotoBody({
   onLightbox: (url: string) => void;
   onOpenOnce: (photo: PhotoRef) => void;
 }) {
+  const { t } = useI18n();
   const { photo } = body;
   const ref: PhotoRef | null =
     info && photo.key
@@ -1326,13 +1344,15 @@ function PhotoBody({
   const canOpen = !mine && !!ref && !!info?.available && !opened && !item.sending;
   const status = mine
     ? info && info.viewers.length > 0
-      ? `Opened${info.viewers.length > 1 ? ` by ${info.viewers.length}` : ""}`
-      : "Not opened yet"
+      ? info.viewers.length > 1
+        ? t("Opened by {n}", { n: info.viewers.length })
+        : t("Opened")
+      : t("Not opened yet")
     : opened || (info && !info.available)
-      ? "Opened"
+      ? t("Opened")
       : photo.media === "audio"
-        ? "Tap to listen once"
-        : "Tap to view once";
+        ? t("Tap to listen once")
+        : t("Tap to view once");
   return (
     <span className="block">
       <button
@@ -1364,10 +1384,10 @@ function PhotoBody({
         <span>
           <span className="block font-semibold">
             {photo.media === "audio"
-              ? `Voice note · ${photo.duration.toFixed(0)} s`
+              ? t("Voice note · {n} s", { n: photo.duration.toFixed(0) })
               : photo.media === "video"
-                ? `Video · view once`
-                : "Photo · view once"}
+                ? t("Video · view once")
+                : t("Photo · view once")}
           </span>
           <span className="block text-xs opacity-70">{status}</span>
         </span>
@@ -1384,19 +1404,20 @@ function ReceiptLabel({
   receipts: { read: string[]; unread: string[] };
   direct: boolean;
 }) {
+  const { t } = useI18n();
   const total = receipts.read.length + receipts.unread.length;
   if (total === 0) return null;
   const allRead = receipts.unread.length === 0;
   const Icon = receipts.read.length > 0 ? CheckCheck : Check;
   const text = direct
     ? allRead
-      ? "Read"
-      : "Sent"
+      ? t("Read")
+      : t("Sent")
     : allRead
-      ? "Read by all"
+      ? t("Read by all")
       : receipts.read.length > 0
-        ? `Read by ${receipts.read.length} of ${total}`
-        : "Sent";
+        ? t("Read by {n} of {total}", { n: receipts.read.length, total })
+        : t("Sent");
   return (
     <>
       <span aria-hidden="true">·</span>

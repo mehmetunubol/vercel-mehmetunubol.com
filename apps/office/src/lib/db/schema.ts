@@ -47,6 +47,8 @@ export const users = pgTable("users", {
   hideOnline: boolean("hide_online").default(false).notNull(),
   // Auto-lock: back to the decoy after this many idle minutes.
   autoLockMinutes: integer("auto_lock_minutes").default(5).notNull(),
+  // Interface language: "en" | "tr", or null to follow the phone's language.
+  locale: varchar("locale", { length: 5 }),
   failedLogins: integer("failed_logins").default(0).notNull(),
   lockedUntil: tz("locked_until"),
   createdAt: tz("created_at").defaultNow().notNull(),

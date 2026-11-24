@@ -18,6 +18,7 @@ chats created by earlier ones.
 | `09-controls`       | The per-address guessing limit and Unblock, quick hide (button and Esc twice), auto-lock, per-chat message lifetime, mute                                                                              |
 | `10-clips`          | One-time voice notes and videos recorded with a fake camera/microphone; one-time photos allow 5 seconds                                                                                                |
 | `11-planner-health` | The Day Planner's Week / Notes / Settings pages (device-only), the admin Health panel                                                                                                                  |
+| `12-turkish`        | A Turkish phone gets the Turkish planner, title and manifest; signed-in app in Turkish; Account → Language pins English, Automatic follows the phone again                                             |
 
 ## Running them
 

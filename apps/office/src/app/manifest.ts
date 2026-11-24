@@ -1,11 +1,15 @@
 import type { MetadataRoute } from "next";
+import { appName } from "@/lib/app-name";
+import { requestLocale } from "@/lib/i18n-server";
 
-export default function manifest(): MetadataRoute.Manifest {
+// Installed name follows the phone's language at install time.
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const { name, short, description } = appName(await requestLocale());
   return {
     id: "/",
-    name: "Day Planner",
-    short_name: "Day Planner",
-    description: "A simple list for your day.",
+    name,
+    short_name: short,
+    description,
     start_url: "/",
     scope: "/",
     display: "standalone",

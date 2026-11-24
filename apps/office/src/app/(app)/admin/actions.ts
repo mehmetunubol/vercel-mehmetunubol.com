@@ -13,8 +13,11 @@ import { setLoginsDisabled, setMessageTtlHours, setPhotosAllowed } from "@/lib/s
 import { logAdmin } from "@/lib/admin-log";
 import { unblockIp } from "@/lib/guessing";
 import { events } from "@/lib/db/schema";
+import type { Vars } from "@/lib/i18n";
 
-export type ActionResult = { ok: true; message?: string } | { ok: false; message: string };
+/** `message` is English with `{name}` placeholders; the form translates it and fills in `vars`. */
+export type ActionResult =
+  { ok: true; message?: string; vars?: Vars } | { ok: false; message: string; vars?: Vars };
 
 async function requireAdmin() {
   const me = await getCurrentUser();
@@ -32,9 +35,9 @@ async function who(userId: string) {
   return u ? `${u.displayName} (@${u.username})` : "an unknown user";
 }
 
-function done(message?: string): ActionResult {
+function done(message?: string, vars?: Vars): ActionResult {
   revalidatePath("/admin");
-  return { ok: true, message };
+  return { ok: true, message, vars };
 }
 
 const passwordField = z
@@ -66,9 +69,14 @@ export async function createUser(_: ActionResult | null, form: FormData): Promis
     })
     .onConflictDoNothing()
     .returning({ id: users.id });
-  if (!inserted.length) return { ok: false, message: `"${parsed.data.username}" already exists.` };
+  if (!inserted.length)
+    return {
+      ok: false,
+      message: "“{username}” already exists.",
+      vars: { username: parsed.data.username },
+    };
   await logAdmin("user.created", `Added ${parsed.data.displayName} (@${parsed.data.username})`);
-  return done(`Added ${parsed.data.displayName}.`);
+  return done("Added {name}.", { name: parsed.data.displayName });
 }
 
 export async function renameUser(_: ActionResult | null, form: FormData): Promise<ActionResult> {
@@ -135,7 +143,7 @@ export async function deleteUser(_: ActionResult | null, form: FormData): Promis
     );
   await db.delete(users).where(eq(users.id, target.id));
   await logAdmin("user.deleted", `Removed ${target.displayName} (@${target.username})`);
-  return done(`Removed ${target.displayName}.`);
+  return done("Removed {name}.", { name: target.displayName });
 }
 
 const groupSchema = z.object({
@@ -171,7 +179,7 @@ export async function createGroup(_: ActionResult | null, form: FormData): Promi
     "group.created",
     `Created ${parsed.data.announcement ? "announcement group" : "group"} "${parsed.data.name}" with ${parsed.data.memberIds.length} members`,
   );
-  return done(`Created ${parsed.data.name}.`);
+  return done("Created {name}.", { name: parsed.data.name });
 }
 
 export async function updateGroup(_: ActionResult | null, form: FormData): Promise<ActionResult> {
@@ -262,7 +270,9 @@ export async function purgeAllMessages(): Promise<ActionResult> {
   await requireAdmin();
   const deleted = await db.delete(messages).returning({ id: messages.id });
   await logAdmin("panic.messages_deleted", `Deleted all messages (${deleted.length})`);
-  return done(`Deleted ${deleted.length} ${deleted.length === 1 ? "message" : "messages"}.`);
+  return done(deleted.length === 1 ? "Deleted 1 message." : "Deleted {n} messages.", {
+    n: deleted.length,
+  });
 }
 
 /** Panic button: deletes every event, past and upcoming. */
@@ -270,7 +280,9 @@ export async function purgeAllEvents(): Promise<ActionResult> {
   await requireAdmin();
   const deleted = await db.delete(events).returning({ id: events.id });
   await logAdmin("panic.events_deleted", `Deleted all events (${deleted.length})`);
-  return done(`Deleted ${deleted.length} ${deleted.length === 1 ? "event" : "events"}.`);
+  return done(deleted.length === 1 ? "Deleted 1 event." : "Deleted {n} events.", {
+    n: deleted.length,
+  });
 }
 
 /**

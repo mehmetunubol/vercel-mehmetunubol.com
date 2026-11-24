@@ -25,3 +25,16 @@ describe("onlineLabel", () => {
     expect(onlineLabel(null, null, now)).toBeNull();
   });
 });
+
+describe("Turkish online labels", () => {
+  const now = new Date(2026, 10, 24, 15, 0);
+  it("uses Turkish words", () => {
+    expect(onlineLabel(true, null, now, "tr")).toBe("Çevrimiçi");
+    expect(onlineLabel(false, new Date(2026, 10, 24, 14, 5).toISOString(), now, "tr")).toBe(
+      "Son görülme 14:05",
+    );
+    expect(onlineLabel(false, new Date(2026, 10, 23, 9, 7).toISOString(), now, "tr")).toBe(
+      "Son görülme dün 09:07",
+    );
+  });
+});

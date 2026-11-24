@@ -4,8 +4,12 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@repo/ui";
 import { dayKey, monthGrid } from "@/lib/event-time";
+import { useI18n } from "@/components/i18n-provider";
 
-const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
+const WEEKDAYS = {
+  en: ["M", "T", "W", "T", "F", "S", "S"],
+  tr: ["P", "S", "Ç", "P", "C", "C", "P"],
+};
 
 export function MonthCalendar({
   eventDays,
@@ -18,13 +22,14 @@ export function MonthCalendar({
   selected: string | null;
   onSelect: (day: string | null) => void;
 }) {
+  const { t, locale, dateLocale } = useI18n();
   const [cursor, setCursor] = useState(() => {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
   });
   const today = dayKey(new Date());
   const weeks = monthGrid(cursor.year, cursor.month);
-  const title = new Date(cursor.year, cursor.month, 1).toLocaleDateString("en-GB", {
+  const title = new Date(cursor.year, cursor.month, 1).toLocaleDateString(dateLocale, {
     month: "long",
     year: "numeric",
   });
@@ -40,7 +45,7 @@ export function MonthCalendar({
         <button
           type="button"
           onClick={() => shift(-1)}
-          aria-label="Previous month"
+          aria-label={t("Previous month")}
           className="grid size-9 place-items-center rounded-full hover:bg-[var(--hairline)]"
         >
           <ChevronLeft size={18} />
@@ -49,14 +54,14 @@ export function MonthCalendar({
         <button
           type="button"
           onClick={() => shift(1)}
-          aria-label="Next month"
+          aria-label={t("Next month")}
           className="grid size-9 place-items-center rounded-full hover:bg-[var(--hairline)]"
         >
           <ChevronRight size={18} />
         </button>
       </div>
       <div className="grid grid-cols-7 text-center">
-        {WEEKDAYS.map((d, i) => (
+        {WEEKDAYS[locale].map((d, i) => (
           <span key={i} className="eyebrow py-1">
             {d}
           </span>
@@ -71,7 +76,12 @@ export function MonthCalendar({
               type="button"
               onClick={() => onSelect(isSelected ? null : key)}
               aria-pressed={isSelected}
-              aria-label={date.toDateString()}
+              aria-label={date.toLocaleDateString(dateLocale, {
+                weekday: "short",
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}
               className={cn(
                 "relative mx-auto my-0.5 grid size-10 place-items-center rounded-full text-sm tabular-nums transition-colors",
                 isSelected

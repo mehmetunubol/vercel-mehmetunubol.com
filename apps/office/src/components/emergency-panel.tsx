@@ -2,17 +2,24 @@
 
 import { useState, useTransition } from "react";
 import { Ban, CalendarX, Trash2 } from "lucide-react";
-import { purgeAllEvents, purgeAllMessages, setSignInsDisabled } from "@/app/(app)/admin/actions";
+import {
+  type ActionResult,
+  purgeAllEvents,
+  purgeAllMessages,
+  setSignInsDisabled,
+} from "@/app/(app)/admin/actions";
+import { useI18n } from "@/components/i18n-provider";
 
 export function EmergencyPanel({ loginsDisabled }: { loginsDisabled: boolean }) {
   const [pending, startTransition] = useTransition();
+  const { t } = useI18n();
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
-  function run(confirmText: string, action: () => Promise<{ ok: boolean; message?: string }>) {
-    if (!window.confirm(confirmText)) return;
+  function run(confirmText: string, action: () => Promise<ActionResult>) {
+    if (!window.confirm(t(confirmText))) return;
     startTransition(async () => {
       const result = await action();
-      setMessage({ ok: result.ok, text: result.message ?? "Done." });
+      setMessage({ ok: result.ok, text: t(result.message ?? "Done.", result.vars) });
     });
   }
 
@@ -20,10 +27,12 @@ export function EmergencyPanel({ loginsDisabled }: { loginsDisabled: boolean }) 
     <div className="space-y-3 px-3 pb-3">
       <div className="rounded-2xl border border-[color-mix(in_oklab,var(--danger)_30%,transparent)] p-3">
         <p className="flex items-center gap-1.5 text-sm font-semibold">
-          <Trash2 size={15} /> Delete all messages
+          <Trash2 size={15} /> {t("Delete all messages")}
         </p>
         <p className="mt-1 text-xs text-[var(--ink-2)]">
-          Permanently deletes every message in every chat, right now. Conversations and groups stay.
+          {t(
+            "Permanently deletes every message in every chat, right now. Conversations and groups stay.",
+          )}
         </p>
         <button
           type="button"
@@ -35,16 +44,18 @@ export function EmergencyPanel({ loginsDisabled }: { loginsDisabled: boolean }) 
           }
           className="btn btn-danger btn-sm mt-3"
         >
-          Delete all messages now
+          {t("Delete all messages now")}
         </button>
       </div>
 
       <div className="rounded-2xl border border-[color-mix(in_oklab,var(--danger)_30%,transparent)] p-3">
         <p className="flex items-center gap-1.5 text-sm font-semibold">
-          <CalendarX size={15} /> Delete all events
+          <CalendarX size={15} /> {t("Delete all events")}
         </p>
         <p className="mt-1 text-xs text-[var(--ink-2)]">
-          Permanently deletes every event, past and upcoming, with all invitations and answers.
+          {t(
+            "Permanently deletes every event, past and upcoming, with all invitations and answers.",
+          )}
         </p>
         <button
           type="button"
@@ -54,18 +65,22 @@ export function EmergencyPanel({ loginsDisabled }: { loginsDisabled: boolean }) 
           }
           className="btn btn-danger btn-sm mt-3"
         >
-          Delete all events now
+          {t("Delete all events now")}
         </button>
       </div>
 
       <div className="rounded-2xl border border-[color-mix(in_oklab,var(--danger)_30%,transparent)] p-3">
         <p className="flex items-center gap-1.5 text-sm font-semibold">
-          <Ban size={15} /> {loginsDisabled ? "Sign-ins are disabled" : "Disable sign-ins"}
+          <Ban size={15} /> {loginsDisabled ? t("Sign-ins are disabled") : t("Disable sign-ins")}
         </p>
         <p className="mt-1 text-xs text-[var(--ink-2)]">
           {loginsDisabled
-            ? 'Nobody but you can sign in. Others see the normal "account locked, try again in 15 minutes" message.'
-            : 'Signs everyone except you out now and blocks new sign-ins. They\'ll see the normal "account locked" message.'}
+            ? t(
+                "Nobody but you can sign in. Others see the normal “account locked, try again in 15 minutes” message.",
+              )
+            : t(
+                "Signs everyone except you out now and blocks new sign-ins. They’ll see the normal “account locked” message.",
+              )}
         </p>
         {loginsDisabled ? (
           <button
@@ -74,7 +89,7 @@ export function EmergencyPanel({ loginsDisabled }: { loginsDisabled: boolean }) 
             onClick={() => run("Allow everyone to sign in again?", () => setSignInsDisabled(false))}
             className="btn btn-primary btn-sm mt-3"
           >
-            Enable sign-ins again
+            {t("Enable sign-ins again")}
           </button>
         ) : (
           <button
@@ -87,7 +102,7 @@ export function EmergencyPanel({ loginsDisabled }: { loginsDisabled: boolean }) 
             }
             className="btn btn-danger btn-sm mt-3"
           >
-            Disable all sign-ins
+            {t("Disable all sign-ins")}
           </button>
         )}
       </div>

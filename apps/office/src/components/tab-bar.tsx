@@ -6,8 +6,10 @@ import { CalendarDays, EyeOff, House, SlidersHorizontal, UserRound } from "lucid
 import { cn } from "@repo/ui";
 import { useApp } from "@/components/app-provider";
 import { hideNow } from "@/lib/hide";
+import { useI18n } from "@/components/i18n-provider";
 
 export function TabBar({ isAdmin }: { isAdmin: boolean }) {
+  const { t } = useI18n();
   const pathname = usePathname();
   const { state } = useApp();
   const pendingInvites = state?.pendingInvites ?? 0;
@@ -16,10 +18,10 @@ export function TabBar({ isAdmin }: { isAdmin: boolean }) {
   if (pathname.startsWith("/c/") || pathname.startsWith("/events/")) return null;
 
   const tabs = [
-    { href: "/", label: "Today", icon: House },
-    { href: "/events", label: "Events", icon: CalendarDays },
-    ...(isAdmin ? [{ href: "/admin", label: "Admin", icon: SlidersHorizontal }] : []),
-    { href: "/account", label: "Account", icon: UserRound },
+    { href: "/", label: t("Today"), icon: House },
+    { href: "/events", label: t("Events"), icon: CalendarDays },
+    ...(isAdmin ? [{ href: "/admin", label: t("Admin"), icon: SlidersHorizontal }] : []),
+    { href: "/account", label: t("Account"), icon: UserRound },
   ];
 
   return (
@@ -43,7 +45,7 @@ export function TabBar({ isAdmin }: { isAdmin: boolean }) {
                 <Icon size={18} strokeWidth={2} />
                 {href === "/admin" && securityAlerts > 0 ? (
                   <span
-                    aria-label={`${securityAlerts} security alerts`}
+                    aria-label={t("{n} security alerts", { n: securityAlerts })}
                     className="absolute -top-1.5 -right-2 grid h-4 min-w-4 place-items-center rounded-full bg-[var(--danger)] px-1 text-[10px] leading-none font-bold text-white tabular-nums"
                   >
                     {securityAlerts}
@@ -51,7 +53,7 @@ export function TabBar({ isAdmin }: { isAdmin: boolean }) {
                 ) : null}
                 {href === "/events" && pendingInvites > 0 ? (
                   <span
-                    aria-label={`${pendingInvites} unanswered invitations`}
+                    aria-label={t("{n} unanswered invitations", { n: pendingInvites })}
                     className="absolute -top-1.5 -right-2 grid h-4 min-w-4 place-items-center rounded-full bg-[var(--danger)] px-1 text-[10px] leading-none font-bold text-white tabular-nums"
                   >
                     {pendingInvites}
@@ -65,8 +67,8 @@ export function TabBar({ isAdmin }: { isAdmin: boolean }) {
         <button
           type="button"
           onClick={hideNow}
-          aria-label="Hide now"
-          title="Hide now"
+          aria-label={t("Hide now")}
+          title={t("Hide now")}
           className="flex items-center rounded-full px-3.5 py-2.5 text-[var(--ink-2)] transition-colors hover:text-[var(--ink)]"
         >
           <EyeOff size={18} strokeWidth={2} />

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Bell, BellOff } from "lucide-react";
+import { useI18n } from "@/components/i18n-provider";
 
 type Status = "checking" | "unsupported" | "unconfigured" | "blocked" | "off" | "on" | "busy";
 
@@ -18,6 +19,7 @@ async function registration() {
 }
 
 export function NotificationsCard() {
+  const { t } = useI18n();
   const [status, setStatus] = useState<Status>("checking");
   const [error, setError] = useState<string | null>(null);
 
@@ -64,7 +66,7 @@ export function NotificationsCard() {
       if (!response.ok) throw new Error();
       setStatus("on");
     } catch {
-      setError("Couldn't turn notifications on for this device.");
+      setError(t("Couldn't turn notifications on for this device."));
       setStatus("off");
     }
   }
@@ -84,11 +86,13 @@ export function NotificationsCard() {
   }
 
   const note: Partial<Record<Status, string>> = {
-    unsupported:
+    unsupported: t(
       "This browser can't receive notifications. On iPhone, add the app to your Home Screen first, then open it from there.",
-    unconfigured: "Notifications aren't set up on the server yet.",
-    blocked:
+    ),
+    unconfigured: t("Notifications aren't set up on the server yet."),
+    blocked: t(
       "Notifications are blocked for this site. Allow them in your browser or phone settings, then come back.",
+    ),
   };
 
   return (
@@ -97,23 +101,22 @@ export function NotificationsCard() {
       style={{ animationDelay: "90ms" }}
     >
       <h2 className="eyebrow flex items-center gap-1.5">
-        <Bell size={12} /> Notifications
+        <Bell size={12} /> {t("Notifications")}
       </h2>
       <p className="text-sm leading-relaxed text-[var(--ink-2)]">
-        Get a nudge on this device when there&rsquo;s a new message, an event invitation or
-        something to review. To keep things discreet, the notification is a random everyday line
-        like &ldquo;Your weekly summary is ready&rdquo;. It never says what the app is, who wrote or
-        what it&rsquo;s about.
+        {t(
+          "Get a nudge on this device when there’s a new message, an event invitation or something to review. To keep things discreet, the notification is a random everyday line like “Your weekly summary is ready”. It never says what the app is, who wrote or what it’s about.",
+        )}
       </p>
       {note[status] ? <p className="text-sm text-[var(--ink-2)]">{note[status]}</p> : null}
       {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
       {status === "on" ? (
         <div className="flex flex-wrap items-center gap-3">
           <span className="flex items-center gap-1.5 text-sm font-medium">
-            <span className="dot dot-in" /> On for this device
+            <span className="dot dot-in" /> {t("On for this device")}
           </span>
           <button type="button" onClick={() => void turnOff()} className="btn btn-quiet btn-sm">
-            <BellOff size={15} /> Turn off
+            <BellOff size={15} /> {t("Turn off")}
           </button>
         </div>
       ) : status === "off" || status === "busy" ? (
@@ -123,7 +126,7 @@ export function NotificationsCard() {
           disabled={status === "busy"}
           className="btn btn-primary"
         >
-          <Bell size={16} /> {status === "busy" ? "Turning on…" : "Turn on for this device"}
+          <Bell size={16} /> {status === "busy" ? t("Turning on…") : t("Turn on for this device")}
         </button>
       ) : null}
     </section>

@@ -7,6 +7,8 @@ import { LoginForm } from "@/components/login-form";
 import { NotesPage } from "@/components/planner/notes-page";
 import { SettingsPage } from "@/components/planner/settings-page";
 import { WeekPage } from "@/components/planner/week-page";
+import type { Locale } from "@/lib/i18n";
+import { useI18n } from "@/components/i18n-provider";
 
 type PlannerTab = "today" | "week" | "notes" | "settings";
 
@@ -38,15 +40,24 @@ interface Task {
 
 const STORAGE_KEY = "day-planner:tasks";
 
-const STARTER_TASKS: Task[] = [
-  { id: "1", text: "Water the plants", done: true },
-  { id: "2", text: "Pay the electricity bill", done: false },
-  { id: "3", text: "Call the dentist", done: false },
-  { id: "4", text: "Buy bread and milk", done: false },
-  { id: "5", text: "30-minute walk", done: true },
-];
+const STARTER_TASKS: Record<Locale, Task[]> = {
+  en: [
+    { id: "1", text: "Water the plants", done: true },
+    { id: "2", text: "Pay the electricity bill", done: false },
+    { id: "3", text: "Call the dentist", done: false },
+    { id: "4", text: "Buy bread and milk", done: false },
+    { id: "5", text: "30-minute walk", done: true },
+  ],
+  tr: [
+    { id: "1", text: "Çiçekleri sula", done: true },
+    { id: "2", text: "Elektrik faturasını öde", done: false },
+    { id: "3", text: "Dişçiyi ara", done: false },
+    { id: "4", text: "Ekmek ve süt al", done: false },
+    { id: "5", text: "30 dakika yürüyüş", done: true },
+  ],
+};
 
-function loadTasks(): Task[] {
+function loadTasks(locale: Locale): Task[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -56,7 +67,7 @@ function loadTasks(): Task[] {
   } catch {
     // Storage blocked or corrupt: fall back to the starter list.
   }
-  return STARTER_TASKS;
+  return STARTER_TASKS[locale];
 }
 
 function saveTasks(tasks: Task[]) {
@@ -70,13 +81,13 @@ function saveTasks(tasks: Task[]) {
 const noSubscribe = () => () => {};
 
 /** Today's date in the viewer's timezone (rendered in the browser only). */
-function useToday() {
+function useToday(dateLocale: string) {
   // A string snapshot: React compares snapshots by identity, so no fresh objects here.
   const value = useSyncExternalStore(
     noSubscribe,
     () => {
       const now = new Date();
-      return `${now.toLocaleDateString("en-GB", { weekday: "long" })}|${now.toLocaleDateString("en-GB", { day: "numeric", month: "long" })}`;
+      return `${now.toLocaleDateString(dateLocale, { weekday: "long" })}|${now.toLocaleDateString(dateLocale, { day: "numeric", month: "long" })}`;
     },
     () => "",
   );
@@ -86,18 +97,19 @@ function useToday() {
 }
 
 export function Gate() {
+  const { t, locale, dateLocale } = useI18n();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<PlannerTab>("today");
   const taps = useRef<{ count: number; last: number }>({ count: 0, last: 0 });
   const [tasks, setTasks] = useState<Task[] | null>(null);
   const [draft, setDraft] = useState("");
-  const today = useToday();
+  const today = useToday(dateLocale);
 
   // Load after mount (localStorage isn't available on the server).
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read from the browser
-    setTasks(loadTasks());
-  }, []);
+    setTasks(loadTasks(locale));
+  }, [locale]);
 
   function update(next: Task[]) {
     setTasks(next);
@@ -106,11 +118,11 @@ export function Gate() {
 
   function onSecretTap() {
     const now = Date.now();
-    const t = taps.current;
-    t.count = now - t.last <= MAX_GAP_MS ? t.count + 1 : 1;
-    t.last = now;
-    if (t.count >= TAPS_TO_OPEN) {
-      t.count = 0;
+    const tap = taps.current;
+    tap.count = now - tap.last <= MAX_GAP_MS ? tap.count + 1 : 1;
+    tap.last = now;
+    if (tap.count >= TAPS_TO_OPEN) {
+      tap.count = 0;
       setOpen(true);
     }
   }
@@ -126,7 +138,7 @@ export function Gate() {
   }
 
   const list = tasks ?? [];
-  const done = list.filter((t) => t.done).length;
+  const done = list.filter((task) => task.done).length;
 
   return (
     <main className="safe-top mx-auto flex min-h-dvh w-full max-w-xl flex-col px-5 pt-10 pb-32">
@@ -141,7 +153,11 @@ export function Gate() {
             {today?.date ?? " "}
           </h1>
           <p className="mt-1 text-[15px] text-[var(--ink-2)] tabular-nums">
-            {tasks ? (list.length ? `${done} of ${list.length} done` : "Nothing planned yet") : " "}
+            {tasks
+              ? list.length
+                ? t("{done} of {total} done", { done, total: list.length })
+                : t("Nothing planned yet")
+              : " "}
           </p>
 
           <form
@@ -157,13 +173,13 @@ export function Gate() {
             <input
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Add a task"
-              aria-label="Add a task"
+              placeholder={t("Add a task")}
+              aria-label={t("Add a task")}
               className="min-w-0 flex-1 bg-transparent py-2 text-base outline-none placeholder:text-[var(--ink-3)]"
             />
             <button
               type="submit"
-              aria-label="Add"
+              aria-label={t("Add")}
               disabled={!draft.trim()}
               className="btn btn-primary size-10 shrink-0 p-0"
             >
@@ -171,11 +187,11 @@ export function Gate() {
             </button>
           </form>
 
-          <section className="glass mt-4 rounded-[1.75rem] p-2" aria-label="Today's list">
-            <h2 className="eyebrow px-3 pt-3 pb-2">Today&rsquo;s list</h2>
+          <section className="glass mt-4 rounded-[1.75rem] p-2" aria-label={t("Today’s list")}>
+            <h2 className="eyebrow px-3 pt-3 pb-2">{t("Today’s list")}</h2>
             {tasks && list.length === 0 ? (
               <p className="px-3 pb-3 text-sm text-[var(--ink-2)]">
-                Add something you&rsquo;d like to get done today.
+                {t("Add something you’d like to get done today.")}
               </p>
             ) : null}
             <ul>
@@ -187,7 +203,7 @@ export function Gate() {
                     aria-checked={task.done}
                     aria-label={task.text}
                     onClick={() =>
-                      update(list.map((t) => (t.id === task.id ? { ...t, done: !t.done } : t)))
+                      update(list.map((x) => (x.id === task.id ? { ...x, done: !x.done } : x)))
                     }
                     className={cn(
                       "grid size-6 shrink-0 place-items-center rounded-full border transition-colors",
@@ -208,8 +224,8 @@ export function Gate() {
                   </span>
                   <button
                     type="button"
-                    aria-label={`Remove ${task.text}`}
-                    onClick={() => update(list.filter((t) => t.id !== task.id))}
+                    aria-label={t("Remove {task}", { task: task.text })}
+                    onClick={() => update(list.filter((x) => x.id !== task.id))}
                     className="grid size-8 shrink-0 place-items-center rounded-full text-[var(--ink-3)] hover:bg-[var(--hairline)]"
                   >
                     <X size={15} />
@@ -222,10 +238,10 @@ export function Gate() {
           {done > 0 ? (
             <button
               type="button"
-              onClick={() => update(list.filter((t) => !t.done))}
+              onClick={() => update(list.filter((x) => !x.done))}
               className="btn btn-quiet btn-sm mt-4 self-start"
             >
-              Clear completed
+              {t("Clear completed")}
             </button>
           ) : null}
         </>
@@ -253,7 +269,7 @@ export function Gate() {
               )}
             >
               <Icon size={18} strokeWidth={2} />
-              <span className={tab === id ? "" : "sr-only sm:not-sr-only"}>{label}</span>
+              <span className={tab === id ? "" : "sr-only sm:not-sr-only"}>{t(label)}</span>
             </button>
           ))}
         </div>

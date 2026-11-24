@@ -69,3 +69,16 @@ describe("withDuePlan", () => {
     expect(flipped.plannedAt).toBeNull();
   });
 });
+
+describe("Turkish labels", () => {
+  const now = new Date(2026, 10, 20, 13, 0);
+  const at = (d: number, h: number, m = 0) => new Date(2026, 10, d, h, m);
+
+  it("reads naturally in Turkish", () => {
+    expect(planLabel("in", at(20, 15), "exact", now, "tr")).toBe("Dönüş: 2 sa içinde");
+    expect(planLabel("out", at(20, 17), "exact", now, "tr")).toBe("Çıkış: saat 17:00");
+    expect(planLabel("in", at(21, 9), "morning", now, "tr")).toBe("Dönüş: yarın sabah");
+    expect(whenLabel(at(20, 13, 30), "exact", now, "tr")).toBe("30 dk içinde");
+    expect(whenLabel(at(25, 9), "morning", now, "tr")).toBe("Çar 25 Kas, sabah");
+  });
+});

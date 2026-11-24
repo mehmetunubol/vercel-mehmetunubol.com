@@ -11,3 +11,6 @@ export const LOCKOUT_MINUTES = 15;
 
 export const USERNAME_PATTERN = /^[a-z0-9._-]{3,32}$/;
 export const MIN_PASSWORD_LENGTH = 8;
+
+// How far ahead a presence change can be scheduled.
+export const MAX_PLAN_DAYS = 60;

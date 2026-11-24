@@ -65,12 +65,20 @@ test("events: create, invite, answer, edit, cancel", async ({ browser }) => {
 
   // Calendar filtering.
   const [y, m, d] = day.split("-").map(Number) as [number, number, number];
-  await admin.click(`[aria-label="${new Date(y, m - 1, d).toDateString()}"]`);
+  // Same label the calendar gives each day button.
+  const dayLabel = (date: Date) =>
+    date.toLocaleDateString("en-GB", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  await admin.click(`[aria-label="${dayLabel(new Date(y, m - 1, d))}"]`);
   await admin.waitForSelector("text=Showing Tomorrow");
   ok(await admin.isVisible("text=Team lunch"), "tapping a day shows its events");
   const other = new Date(y, m - 1, d + 2);
   if (other.getMonth() !== m - 1) await admin.click('[aria-label="Next month"]');
-  await admin.click(`[aria-label="${other.toDateString()}"]`);
+  await admin.click(`[aria-label="${dayLabel(other)}"]`);
   await admin.waitForSelector("text=Nothing planned that day.");
   ok(true, "empty day says so");
   await admin.click("text=Show all upcoming");

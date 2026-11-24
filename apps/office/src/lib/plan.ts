@@ -1,3 +1,5 @@
+import { MAX_PLAN_DAYS } from "@/lib/constants";
+import { dateLocale, type Locale } from "@/lib/i18n";
 import type { PlanPrecision, Presence } from "@/lib/types";
 
 /**
@@ -14,7 +16,7 @@ export const PART_OF_DAY_HOUR: Record<Exclude<PlanPrecision, "exact">, number> =
 };
 
 export const PLAN_PRECISIONS = ["exact", "morning", "afternoon", "evening"] as const;
-export const MAX_PLAN_DAYS = 60;
+export { MAX_PLAN_DAYS } from "@/lib/constants";
 
 export const opposite = (presence: Presence): Presence => (presence === "in" ? "out" : "in");
 
@@ -29,9 +31,10 @@ function dayDiff(from: Date, to: Date) {
   return Math.round((startOfDay(to).getTime() - startOfDay(from).getTime()) / 86_400_000);
 }
 
-function dayName(date: Date, now: Date) {
-  const weekday = date.toLocaleDateString("en-GB", { weekday: "short" });
-  const day = date.toLocaleDateString("en-GB", {
+function dayName(date: Date, now: Date, locale: Locale = "en") {
+  const tag = dateLocale(locale);
+  const weekday = date.toLocaleDateString(tag, { weekday: "short" });
+  const day = date.toLocaleDateString(tag, {
     day: "numeric",
     month: "short",
     ...(date.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}),
@@ -39,39 +42,66 @@ function dayName(date: Date, now: Date) {
   return `${weekday} ${day}`;
 }
 
-function relative(minutes: number) {
+function relative(minutes: number, locale: Locale = "en") {
   const total = Math.max(1, Math.round(minutes));
-  if (total < 60) return `in ${total} min`;
+  const tr = locale === "tr";
+  if (total < 60) return tr ? `${total} dk içinde` : `in ${total} min`;
   // Past an hour, 5-minute steps read more naturally ("in 1 h 55 min").
   const rounded = Math.round(total / 5) * 5;
   const h = Math.floor(rounded / 60);
   const m = rounded % 60;
+  if (tr) return m === 0 ? `${h} sa içinde` : `${h} sa ${m} dk içinde`;
   return m === 0 ? `in ${h} h` : `in ${h} h ${m} min`;
 }
 
+const PART_TR: Record<Exclude<PlanPrecision, "exact">, string> = {
+  morning: "sabah",
+  afternoon: "öğleden sonra",
+  evening: "akşam",
+};
+
 /** The "when" part: "in 2 h", "at 15:00", "tomorrow morning", "Wed 25 Nov at 09:00". */
-export function whenLabel(at: Date, precision: PlanPrecision, now = new Date()) {
+export function whenLabel(
+  at: Date,
+  precision: PlanPrecision,
+  now = new Date(),
+  locale: Locale = "en",
+) {
   const days = dayDiff(now, at);
+  const tr = locale === "tr";
   if (precision !== "exact") {
-    if (days === 0) return precision === "evening" ? "this evening" : `this ${precision}`;
-    if (days === 1) return `tomorrow ${precision}`;
-    return `${dayName(at, now)}, ${precision}`;
+    const part = tr ? PART_TR[precision] : precision;
+    if (days === 0)
+      return tr ? `bu ${part}` : precision === "evening" ? "this evening" : `this ${precision}`;
+    if (days === 1) return tr ? `yarın ${part}` : `tomorrow ${precision}`;
+    return `${dayName(at, now, locale)}, ${part}`;
   }
   const minutes = (at.getTime() - now.getTime()) / 60_000;
-  if (minutes <= 0) return "now";
-  if (days === 0) return minutes < 180 ? relative(minutes) : `at ${clock(at)}`;
-  if (days === 1) return `tomorrow at ${clock(at)}`;
-  return `${dayName(at, now)} at ${clock(at)}`;
+  if (minutes <= 0) return tr ? "şimdi" : "now";
+  if (days === 0)
+    return minutes < 180 ? relative(minutes, locale) : tr ? `saat ${clock(at)}` : `at ${clock(at)}`;
+  if (days === 1) return tr ? `yarın ${clock(at)}` : `tomorrow at ${clock(at)}`;
+  return tr
+    ? `${dayName(at, now, locale)} ${clock(at)}`
+    : `${dayName(at, now, locale)} at ${clock(at)}`;
 }
 
 /** Full plan sentence, e.g. "Back in 2 h" or "Leaving at 17:00". */
-export function planLabel(target: Presence, at: Date, precision: PlanPrecision, now = new Date()) {
-  return `${target === "in" ? "Back" : "Leaving"} ${whenLabel(at, precision, now)}`;
+export function planLabel(
+  target: Presence,
+  at: Date,
+  precision: PlanPrecision,
+  now = new Date(),
+  locale: Locale = "en",
+) {
+  const when = whenLabel(at, precision, now, locale);
+  if (locale === "tr") return `${target === "in" ? "Dönüş" : "Çıkış"}: ${when}`;
+  return `${target === "in" ? "Back" : "Leaving"} ${when}`;
 }
 
 /** Absolute detail for the planner preview, e.g. "Wed 25 Nov, 09:00". */
-export function exactLabel(at: Date, now = new Date()) {
-  return `${dayName(at, now)}, ${clock(at)}`;
+export function exactLabel(at: Date, now = new Date(), locale: Locale = "en") {
+  return `${dayName(at, now, locale)}, ${clock(at)}`;
 }
 
 /** Local date from "YYYY-MM-DD" plus a part of day or "HH:MM". */
@@ -128,12 +158,13 @@ export function withDuePlan<T extends Plannable>(person: T, now = Date.now()): T
 }
 
 /** Status line for a person: the plan if there is one. */
-export function personPlanLabel(person: Plannable, now = new Date()) {
+export function personPlanLabel(person: Plannable, now = new Date(), locale: Locale = "en") {
   if (!person.plannedAt || !person.plannedPresence) return null;
   return planLabel(
     person.plannedPresence,
     new Date(person.plannedAt),
     person.plannedPrecision ?? "exact",
     now,
+    locale,
   );
 }
