@@ -56,3 +56,7 @@ setup and the encryption design.
   with that header; use made-up usernames there so real accounts don't lock.
 - One-time clips (voice/video) share the photo pipeline (`MediaType` in
   `lib/photo.ts`); they are always "once" and at most `MAX_CLIP_SECONDS`.
+- Pushing to `master` is allowed without asking (the owner's standing
+  instruction). Every push deploys to Vercel immediately, so after each push
+  watch the "Office checks" GitHub Actions run, and if anything fails, fix it
+  and push the fix right away.
