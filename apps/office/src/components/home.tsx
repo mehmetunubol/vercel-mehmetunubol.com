@@ -9,7 +9,7 @@ import { dayHeading, endOf, timeRange } from "@/lib/event-time";
 import { useApp, useNow } from "@/components/app-provider";
 import { Avatar } from "@/components/avatar";
 import { PresenceCard } from "@/components/presence-card";
-import { sinceLabel, timeLabel, ttlLabel } from "@/lib/format";
+import { onlineLabel, sinceLabel, timeLabel, ttlLabel } from "@/lib/format";
 import { personPlanLabel, withDuePlan } from "@/lib/plan";
 import type { Person } from "@/lib/types";
 import { ADMIN_USERNAME } from "@/lib/constants";
@@ -172,7 +172,11 @@ export function Home() {
                         {chat.announcement ? <Megaphone size={18} /> : <Users size={18} />}
                       </span>
                     ) : (
-                      <Avatar name={title} presence={other?.presence} />
+                      <Avatar
+                        name={title}
+                        presence={other?.presence}
+                        online={other?.online === true}
+                      />
                     )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-medium">{title}</span>
@@ -235,14 +239,21 @@ function PeopleGroup({
       <ul>
         {sorted.map((person) => {
           const isMe = person.id === meId;
-          const detail =
+          const office =
             personPlanLabel(person) ??
             (person.presenceUpdatedAt
               ? `Since ${timeLabel(person.presenceUpdatedAt)}`
               : "Not set yet");
+          // Your own line shows only the office status.
+          const seen = isMe ? null : onlineLabel(person.online, person.lastSeenAt);
+          const detail = seen ? `${office} · ${seen}` : office;
           const content = (
             <>
-              <Avatar name={person.displayName} presence={person.presence} />
+              <Avatar
+                name={person.displayName}
+                presence={person.presence}
+                online={!isMe && person.online === true}
+              />
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium">
                   {person.displayName}

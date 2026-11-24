@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { BASE, api, deleteLocalKeys, ok, send, signIn, userIds } from "./helpers";
+import { BASE, api, closeAllWindows, deleteLocalKeys, ok, send, signIn, userIds } from "./helpers";
 
 // Announcement groups, reactions, read receipts, and the locked-device rule.
 // Runs after the earlier suites, against the data they created.
+
+test.afterEach(({ browser }) => closeAllWindows(browser));
 
 test("chat: announcements, reactions, read receipts", async ({ browser }) => {
   const admin = await signIn(browser, "user", "admin-pass-123", "dark");

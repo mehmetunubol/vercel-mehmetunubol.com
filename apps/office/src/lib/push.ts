@@ -2,7 +2,7 @@ import { after } from "next/server";
 import { and, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import webpush from "web-push";
 import { db } from "@/lib/db";
-import { pushSubscriptions } from "@/lib/db/schema";
+import { pushSubscriptions, users } from "@/lib/db/schema";
 
 /**
  * Web Push "nudges". Deliberately content-free: the server sends a push with
@@ -32,8 +32,16 @@ function configure() {
 }
 
 async function send(userIds: string[]) {
-  const unique = [...new Set(userIds)];
-  if (!unique.length || !configure()) return;
+  const requested = [...new Set(userIds)];
+  if (!requested.length || !configure()) return;
+  // Someone using the app right now sees the update there; don't buzz their phone.
+  const online = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(inArray(users.id, requested), sql`${users.onlineUntil} > now()`));
+  const onlineIds = new Set(online.map((u) => u.id));
+  const unique = requested.filter((id) => !onlineIds.has(id));
+  if (!unique.length) return;
   // Claim the devices that haven't had a nudge in the last minute, atomically,
   // so parallel requests don't double-send.
   const due = await db

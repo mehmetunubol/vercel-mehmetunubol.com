@@ -3,8 +3,11 @@ import {
   BASE,
   FAKE_PUSH,
   clearPushLog,
+  closeAllWindows,
+  goAway,
   ok,
   pushLog,
+  resetOnline,
   send,
   signIn,
   sleep,
@@ -16,7 +19,10 @@ import {
 // Push nudges: who gets them, rate limit, no payload, and what the phone shows.
 // Runs after the earlier suites, against the data they created.
 
+test.afterEach(({ browser }) => closeAllWindows(browser));
+
 test("push: content-free nudges", async ({ browser }) => {
+  await resetOnline();
   // A fake device for each user, pointing at the fake push service.
   for (const u of ["user", "ayse", "burak"]) {
     await sql(
@@ -49,20 +55,24 @@ test("push: content-free nudges", async ({ browser }) => {
     "at most one nudge per minute per device",
   );
 
-  // 3. Group message → every other member.
+  // 3. Group message → every other member who isn't using the app right now.
+  // Ayşe has the app open, so she sees it there and gets no nudge.
   await clearPushLog();
   await burak.click('a[href^="/c/"]:has-text("Studio")');
   await send(burak, "Group push test");
   ok(
-    await waitFor(async () => {
-      const l = await pushLog();
-      return l.some((x) => x.path === "/user") && l.some((x) => x.path === "/ayse");
-    }),
-    "group message nudges all other members",
+    await waitFor(async () => (await pushLog()).some((x) => x.path === "/user")),
+    "group message nudges members who aren't in the app",
+  );
+  await sleep(1500);
+  ok(
+    !(await pushLog()).some((x) => x.path === "/ayse"),
+    "members using the app right now are not nudged",
   );
   ok(!(await pushLog()).some((x) => x.path === "/burak"), "not the group sender");
 
-  // 4. Event invitation → the invitee.
+  // 4. Event invitation → the invitee (Burak switches to another app first).
+  await goAway(burak);
   await clearPushLog();
   const ids = await userIds(ayse);
   const created = await ayse.evaluate(
@@ -105,7 +115,8 @@ test("push: content-free nudges", async ({ browser }) => {
   );
   await sql("update users set locked_until = null, failed_logins = 0 where username = 'burak'");
 
-  // 6. Expired subscriptions are cleaned up.
+  // 6. Expired subscriptions are cleaned up. (Ayşe leaves the app so she's nudged.)
+  await goAway(ayse);
   await sql(
     "insert into push_subscriptions (user_id, endpoint, p256dh, auth) select id, $1, 'BPlaceholderKey', 'placeholder' from users where username = 'ayse'",
     [`${FAKE_PUSH}/gone/ayse`],

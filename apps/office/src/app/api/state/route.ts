@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { conversationMembers, conversations, messages, users } from "@/lib/db/schema";
 import { deleteExpiredMessages } from "@/lib/cleanup";
 import { pendingInviteCount } from "@/lib/events";
+import { heartbeat } from "@/lib/online";
 import { applyDuePlans } from "@/lib/presence";
 import { deleteOldAlerts, unseenAlertCount } from "@/lib/security";
 import { getLoginsDisabled, getMessageTtlHours, getPhotosAllowed } from "@/lib/settings";
@@ -15,7 +16,8 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const me = await getCurrentUser();
   if (!me) return unauthorized();
-  await Promise.all([deleteExpiredMessages(), applyDuePlans()]);
+  // Polled every ~5 s while the app is on screen, so it doubles as the online check-in.
+  await Promise.all([deleteExpiredMessages(), applyDuePlans(), heartbeat(me.id)]);
 
   const [people, myConversations, ttlHours, pendingInvites, photosAllowed] = await Promise.all([
     db
@@ -29,6 +31,9 @@ export async function GET() {
         plannedAt: users.plannedAt,
         plannedPrecision: users.plannedPrecision,
         hasKey: sql<boolean>`${users.publicKey} is not null`,
+        hideOnline: users.hideOnline,
+        online: sql<boolean>`coalesce(${users.onlineUntil} > now(), false)`,
+        lastSeenAt: users.lastSeenAt,
       })
       .from(users)
       .orderBy(asc(users.displayName)),
@@ -85,6 +90,12 @@ export async function GET() {
     .filter((c) => c.kind === "group" || c.memberIds.length === 2)
     .sort((a, b) => (b.lastMessageAt ?? "").localeCompare(a.lastMessageAt ?? ""));
 
+  // Online status is shared only between people who both show theirs.
+  const visiblePeople = people.map(({ hideOnline, online, lastSeenAt, ...person }) => {
+    const shown = person.id === me.id || (!me.hideOnline && !hideOnline);
+    return { ...person, online: shown ? online : null, lastSeenAt: shown ? lastSeenAt : null };
+  });
+
   return Response.json({
     me: {
       id: me.id,
@@ -92,8 +103,9 @@ export async function GET() {
       displayName: me.displayName,
       isAdmin: me.isAdmin,
       publicKey: me.publicKey,
+      hideOnline: me.hideOnline,
     },
-    people: people.sort((a, b) =>
+    people: visiblePeople.sort((a, b) =>
       a.username === ADMIN_USERNAME ? -1 : b.username === ADMIN_USERNAME ? 1 : 0,
     ),
     chats,

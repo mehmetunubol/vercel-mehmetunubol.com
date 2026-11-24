@@ -148,11 +148,55 @@ export function AccountView() {
           the people in the conversation. Your key is protected by your password. If an admin resets
           your password, earlier messages to you can no longer be read.
         </p>
+        <OnlineStatusToggle />
       </section>
 
       <button type="button" onClick={logOut} className="btn btn-quiet w-full py-3">
         <LogOut size={18} /> Sign out
       </button>
     </main>
+  );
+}
+
+/** "Show when I'm online": reciprocal, so hiding yours hides everyone else's from you. */
+function OnlineStatusToggle() {
+  const { state, refresh } = useApp();
+const [saving, setSaving] = useState(false);
+  // Flip the switch immediately; the server's answer replaces it after refresh.
+  const [optimistic, setOptimistic] = useState<boolean | null>(null);
+  if (!state) return null;
+  const showing = optimistic ?? !state.me.hideOnline;
+
+  async function toggle() {
+    setSaving(true);
+    setOptimistic(!showing);
+    await fetch("/api/me/privacy", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ hideOnline: showing }),
+    }).catch(() => {});
+await refresh();
+    setOptimistic(null);
+    setSaving(false);
+  }
+
+  return (
+    <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[var(--hairline)] bg-[var(--field)] p-3">
+      <input
+        type="checkbox"
+        name="showOnline"
+        checked={showing}
+        disabled={saving}
+        onChange={() => void toggle()}
+        className="mt-0.5 size-4 accent-[var(--ink)]"
+      />
+      <span>
+        <span className="block text-sm font-medium">Show when I&rsquo;m online</span>
+        <span className="block text-xs text-[var(--ink-2)]">
+          Others see when you have the app open, when you were last seen, and when you&rsquo;re
+          typing. If you turn this off, you won&rsquo;t see theirs either.
+        </span>
+      </span>
+    </label>
   );
 }

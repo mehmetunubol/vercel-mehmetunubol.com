@@ -30,3 +30,23 @@ export function ttlLabel(hours: number) {
   if (hours % 24 === 0) return hours === 24 ? "24 hours" : `${hours / 24} days`;
   return hours === 1 ? "1 hour" : `${hours} hours`;
 }
+
+/**
+ * "Online", or the exact time someone was last active:
+ * "Last seen 14:05", "Last seen yesterday 14:05", "Last seen Wed 14:05",
+ * "Last seen 21 Nov 14:05". Null when it isn't shared.
+ */
+export function onlineLabel(online: boolean | null, lastSeenAt: string | null, now = new Date()) {
+  if (online === null) return null;
+  if (online) return "Online";
+  if (!lastSeenAt) return "Not seen yet";
+  const seen = new Date(lastSeenAt);
+  const time = `${pad(seen.getHours())}:${pad(seen.getMinutes())}`;
+  const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((startOf(now) - startOf(seen)) / 86_400_000);
+  if (days <= 0) return `Last seen ${time}`;
+  if (days === 1) return `Last seen yesterday ${time}`;
+  if (days < 7)
+    return `Last seen ${seen.toLocaleDateString("en-GB", { weekday: "short" })} ${time}`;
+  return `Last seen ${seen.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} ${time}`;
+}

@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { BASE, api, ok, signIn, sql, waitFor } from "./helpers";
+import { BASE, api, closeAllWindows, ok, signIn, sql, waitFor } from "./helpers";
 
 // One-time and ordinary photos. Runs after the earlier suites.
 
@@ -50,6 +50,8 @@ async function viewOnce(page: Page, closeBy: "button" | "leaving" = "button") {
   }
   await expect(viewer).toBeHidden();
 }
+
+test.afterEach(({ browser }) => closeAllWindows(browser));
 
 test("photos: one-time and ordinary", async ({ browser }) => {
   const admin = await signIn(browser, "user", "admin-pass-123", "dark");

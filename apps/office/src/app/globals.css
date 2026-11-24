@@ -34,6 +34,8 @@
 
   --mine: #1c1b19;
   --mine-ink: #f6f2ea;
+
+  --online: #3f86d9; /* "app open right now": blue, distinct from the green office dot */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -63,6 +65,8 @@
 
     --mine: #f2eee6;
     --mine-ink: #161616;
+
+    --online: #6fb1ff;
   }
 }
 
@@ -409,4 +413,47 @@
   background: var(--mine);
   color: var(--mine-ink);
   border-color: transparent;
+}
+
+/* Online ring around an avatar: the person has the app open right now. */
+.avatar-online {
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 3.5px var(--online),
+    0 0 14px 1px color-mix(in oklab, var(--online) 45%, transparent);
+}
+
+/* Three pulsing dots for "typing…". */
+.typing-dots span {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin: 0 1.5px;
+  border-radius: 999px;
+  background: currentColor;
+  animation: typing 1.2s infinite ease-in-out;
+}
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .typing-dots span {
+    animation: none;
+    opacity: 0.6;
+  }
 }

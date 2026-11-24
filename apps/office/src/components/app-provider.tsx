@@ -83,6 +83,19 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
 
   usePolling(refresh, 5000);
 
+  // Tell the server right away when the app goes to the background or closes,
+  // so others see "Last seen …" within seconds instead of after the 30 s window.
+  useEffect(() => {
+    const away = () => navigator.sendBeacon?.("/api/me/away");
+    const onVisibility = () => document.visibilityState === "hidden" && away();
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", away);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", away);
+    };
+  }, []);
+
   useEffect(() => {
     void loadIdentity(userId).then(setStored);
   }, [userId]);

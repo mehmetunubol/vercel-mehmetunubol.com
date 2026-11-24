@@ -31,7 +31,9 @@ export async function prepareImage(file: File): Promise<PreparedImage> {
   bitmap.close();
 
   for (const quality of [0.82, 0.7, 0.55, 0.4]) {
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", quality),
+    );
     if (!blob) throw new Error("Couldn't encode the photo");
     if (blob.size <= MAX_BYTES || quality === 0.4) {
       return { bytes: new Uint8Array(await blob.arrayBuffer()), mime: "image/jpeg", width, height };

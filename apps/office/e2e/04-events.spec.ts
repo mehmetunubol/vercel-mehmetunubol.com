@@ -1,5 +1,5 @@
 import { test } from "@playwright/test";
-import { BASE, api, localDay, ok, signIn, userIds } from "./helpers";
+import { BASE, api, closeAllWindows, localDay, ok, signIn, userIds } from "./helpers";
 
 // Events: creating, inviting, answers, calendar, privacy, editing and cancelling.
 // Runs after the earlier suites, against the data they created.
@@ -10,6 +10,8 @@ interface EventJson {
   startsAt: string;
   invites: { userId: string; response: string }[];
 }
+
+test.afterEach(({ browser }) => closeAllWindows(browser));
 
 test("events: create, invite, answer, edit, cancel", async ({ browser }) => {
   const ayse = await signIn(browser, "ayse", "ayse-pass-2", "light");

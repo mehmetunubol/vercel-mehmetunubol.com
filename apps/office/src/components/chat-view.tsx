@@ -34,7 +34,7 @@ import {
   photoAad,
 } from "@/lib/photo";
 import { OnceViewer, PhotoLightbox, type PhotoRef, PhotoThumb } from "@/components/photo-views";
-import { timeLabel, ttlLabel } from "@/lib/format";
+import { onlineLabel, timeLabel, ttlLabel } from "@/lib/format";
 import { personPlanLabel, withDuePlan } from "@/lib/plan";
 import { ADMIN_USERNAME, MAX_MESSAGE_CHARS } from "@/lib/constants";
 import type { Presence } from "@/lib/types";
@@ -145,6 +145,9 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   } | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [onceOpen, setOnceOpen] = useState<PhotoRef | null>(null);
+  // Who else is typing here, and when we last told the server we are.
+  const [typing, setTyping] = useState<string[]>([]);
+  const lastTypingPing = useRef(0);
   const wire = useRef<Map<string, WireMessage>>(new Map());
   const cursor = useRef<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -239,8 +242,10 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       reactions: WireReaction[];
       liveIds: string[];
       photos: PhotoInfo[];
+      typing: string[];
     };
     setPhotos(new Map(data.photos.map((p) => [p.messageId, p])));
+    setTyping(data.typing ?? []);
     const { messages } = data;
     setReads(data.reads);
     if (version === reactionsVersion.current) setReactions(data.reactions);
@@ -316,6 +321,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   const otherLive = other ? personById(other.id) : undefined;
   const otherStatus = otherLive ? withDuePlan(otherLive) : undefined;
   const otherPlan = otherStatus ? personPlanLabel(otherStatus) : null;
+  const otherOnline = otherStatus ? onlineLabel(otherStatus.online, otherStatus.lastSeenAt) : null;
   const withoutKeys = members.filter((m) => !m.publicKey && m.id !== meId);
   const isAnnouncement = conversation?.announcement ?? false;
   const canPost = !isAnnouncement || state?.me.isAdmin === true;
@@ -621,23 +627,30 @@ export function ChatView({ conversationId }: { conversationId: string }) {
             <Avatar
               name={other.displayName}
               presence={otherStatus?.presence ?? other.presence}
+              online={otherStatus?.online === true}
               size={36}
             />
           ) : null}
           <div className="min-w-0 flex-1">
             <p className="truncate leading-tight font-semibold">{title || " "}</p>
             <p className="truncate text-xs text-[var(--ink-2)]">
-              {conversation?.kind === "group"
-                ? isAnnouncement
-                  ? `Announcements · ${members.length} members`
-                  : members.map((m) => m.displayName.split(" ")[0]).join(", ")
-                : otherStatus
-                  ? `${otherStatus.presence === "in" ? "In the office" : "Out of the office"}${
-                      otherPlan
-                        ? ` · ${otherPlan.charAt(0).toLowerCase()}${otherPlan.slice(1)}`
-                        : ""
-                    }`
-                  : ""}
+              {conversation?.kind === "direct" && typing.length > 0
+                ? "typing…"
+                : conversation?.kind === "group"
+                  ? isAnnouncement
+                    ? `Announcements · ${members.length} members`
+                    : members.map((m) => m.displayName.split(" ")[0]).join(", ")
+                  : otherStatus
+                    ? [
+                        otherStatus.presence === "in" ? "In the office" : "Out of the office",
+                        otherPlan
+                          ? `${otherPlan.charAt(0).toLowerCase()}${otherPlan.slice(1)}`
+                          : null,
+                        otherOnline,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")
+                    : ""}
             </p>
           </div>
         </div>
@@ -895,6 +908,21 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       </div>
 
       <footer className="safe-bottom relative z-20 px-3 pt-1">
+        {typing.length > 0 ? (
+          <p
+            aria-live="polite"
+            className="mx-auto mb-1.5 flex max-w-3xl items-center gap-2 px-3 text-xs text-[var(--ink-2)]"
+          >
+            <span className="typing-dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+            {typing.length === 1
+              ? `${nameOf(typing[0]!)} is typing…`
+              : `${typing.map((id) => nameOf(id).split(" ")[0]).join(" and ")} are typing…`}
+          </p>
+        ) : null}
         {withoutKeys.length > 0 && identityStatus === "ready" ? (
           <p className="mx-auto mb-2 max-w-3xl px-2 text-xs text-[var(--ink-2)]">
             {withoutKeys.map((m) => m.displayName).join(", ")}{" "}
@@ -1018,7 +1046,22 @@ export function ChatView({ conversationId }: { conversationId: string }) {
               <textarea
                 ref={composer}
                 value={draft}
-                onChange={(e) => setDraft(e.target.value.slice(0, MAX_MESSAGE_CHARS))}
+                onChange={(e) => {
+                  const value = e.target.value.slice(0, MAX_MESSAGE_CHARS);
+                  setDraft(value);
+                  // "typing…" for others, at most every 3 s (skipped while editing or hidden).
+                  if (
+                    value.trim() &&
+                    !editing &&
+                    !state?.me.hideOnline &&
+                    Date.now() - lastTypingPing.current > 3000
+                  ) {
+                    lastTypingPing.current = Date.now();
+                    void fetch(`/api/conversations/${conversationId}/typing`, {
+                      method: "POST",
+                    }).catch(() => {});
+                  }
+                }}
                 onKeyDown={(e) => {
                   if (
                     e.key === "Enter" &&

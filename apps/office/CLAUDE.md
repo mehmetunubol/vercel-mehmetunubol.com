@@ -39,3 +39,9 @@ setup and the encryption design.
   `attachments`. One-time photos: never serve them to the sender, record a view
   per recipient (`attachment_views`), erase the ciphertext once all recipients
   have viewed. Don't add server-side image processing (thumbnails, previews).
+- Online status (`lib/online.ts`): the `/api/state` poll is the check-in, and
+  `/api/me/away` (a beacon on hide) marks someone offline. "Hide my online
+  status" is reciprocal and has no admin exception; keep it that way. Typing
+  follows the same rule. Push skips people who are online.
+- Browser tests share one browser: every suite closes its windows afterwards
+  (`closeAllWindows`), or open windows keep their users "online".

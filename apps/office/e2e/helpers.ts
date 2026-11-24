@@ -143,3 +143,35 @@ export async function localDay(page: Page, offsetDays = 0) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }, offsetDays);
 }
+
+/** Simulates switching to another app: the page reports itself hidden. */
+export async function goAway(page: Page) {
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+}
+
+/** Simulates coming back to the app. */
+export async function comeBack(page: Page) {
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => "visible",
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+}
+
+/**
+ * Closes every window a suite opened. The browser is shared between suites,
+ * and a window left open keeps checking in, so its user would stay "online".
+ */
+export async function closeAllWindows(browser: Browser) {
+  await Promise.all(browser.contexts().map((context) => context.close()));
+}
+
+/** Marks everyone offline, for suites that depend on who is online. */
+export async function resetOnline() {
+  await sql("update users set online_until = null");
+}

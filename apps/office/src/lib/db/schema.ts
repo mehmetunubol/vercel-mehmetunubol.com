@@ -39,6 +39,12 @@ export const users = pgTable("users", {
   plannedPrecision: varchar("planned_precision", { length: 16 }).$type<
     "exact" | "morning" | "afternoon" | "evening"
   >(),
+  // Online: the app is open and on screen. Heartbeats push online_until ahead;
+  // leaving the app sets it to now. last_seen_at is the latest activity.
+  onlineUntil: tz("online_until"),
+  lastSeenAt: tz("last_seen_at"),
+  // Hide my online status (and typing). Reciprocal: you then don't see others'.
+  hideOnline: boolean("hide_online").default(false).notNull(),
   failedLogins: integer("failed_logins").default(0).notNull(),
   lockedUntil: tz("locked_until"),
   createdAt: tz("created_at").defaultNow().notNull(),
@@ -70,6 +76,8 @@ export const conversationMembers = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     lastReadAt: tz("last_read_at").defaultNow().notNull(),
+    // Last "typing…" signal in this conversation.
+    typingAt: tz("typing_at"),
     joinedAt: tz("joined_at").defaultNow().notNull(),
   },
   (t) => [

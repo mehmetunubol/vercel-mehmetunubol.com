@@ -6,10 +6,12 @@ import {
   conversationMembers,
   messageReactions,
   messages,
+  users,
 } from "@/lib/db/schema";
 import { deleteExpiredMessages } from "@/lib/cleanup";
 import { getConversation, isMember, isUuid } from "@/lib/conversations";
 import { notifyUsers } from "@/lib/push";
+import { TYPING_SECONDS } from "@/lib/online";
 import { getMessageTtlHours, getPhotosAllowed } from "@/lib/settings";
 import { badRequest, forbidden, getCurrentUser, unauthorized } from "@/lib/session";
 import { sendMessageSchema } from "@/lib/validation";
@@ -73,7 +75,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   // Read state and reactions are small and change on older messages too, so
   // every poll returns them in full for the conversation.
-  const [reads, reactions, liveIds, photoRows, photoViews] = await Promise.all([
+  const [reads, reactions, liveIds, photoRows, photoViews, typingRows] = await Promise.all([
     db
       .select({
         userId: conversationMembers.userId,
@@ -114,14 +116,30 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       .innerJoin(attachments, eq(attachments.id, attachmentViews.attachmentId))
       .innerJoin(messages, eq(messages.id, attachments.messageId))
       .where(and(eq(messages.conversationId, id), live)),
+    // Who is typing (only among people who show their online status).
+    me.hideOnline
+      ? Promise.resolve([] as { userId: string }[])
+      : db
+          .select({ userId: conversationMembers.userId })
+          .from(conversationMembers)
+          .innerJoin(users, eq(users.id, conversationMembers.userId))
+          .where(
+            and(
+              eq(conversationMembers.conversationId, id),
+              sql`${conversationMembers.userId} <> ${me.id}`,
+              sql`${conversationMembers.typingAt} > now() - make_interval(secs => ${TYPING_SECONDS})`,
+              eq(users.hideOnline, false),
+            ),
+          ),
   ]);
+  const typing = typingRows.map((r) => r.userId);
   // Photo details (never the bytes) and, for one-time photos, who has opened them.
   const photos = photoRows.map((p) => ({
     ...p,
     viewers: photoViews.filter((v) => v.attachmentId === p.id).map((v) => v.userId),
   }));
 
-  return Response.json({ messages: rows, reads, reactions, liveIds, photos });
+  return Response.json({ messages: rows, reads, reactions, liveIds, photos, typing });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -199,6 +217,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       throw error;
     }
   }
+  // Sending ends "typing…".
+  await db
+    .update(conversationMembers)
+    .set({ typingAt: null })
+    .where(and(eq(conversationMembers.conversationId, id), eq(conversationMembers.userId, me.id)));
   notifyUsers(conversation.members.map((m) => m.id).filter((uid) => uid !== me.id));
   return Response.json(row);
 }

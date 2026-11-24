@@ -1,10 +1,12 @@
 import { type Page, test } from "@playwright/test";
-import { localDay, ok, signIn } from "./helpers";
+import { closeAllWindows, localDay, ok, signIn } from "./helpers";
 
 // Scheduled "back in / leaving at" changes and the In / Out lists.
 // Runs after the earlier suites, against the data they created.
 
 const text = (p: Page) => p.evaluate(() => document.body.innerText);
+
+test.afterEach(({ browser }) => closeAllWindows(browser));
 
 test("presence: in/out lists and scheduled status changes", async ({ browser }) => {
   const admin = await signIn(browser, "user", "admin-pass-123", "light");

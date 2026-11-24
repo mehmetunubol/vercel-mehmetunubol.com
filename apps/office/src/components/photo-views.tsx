@@ -14,12 +14,24 @@ export interface PhotoRef {
   mime: string;
 }
 
-async function loadPhoto({ attachmentId, conversationId, senderId, messageId, photoKey, mime }: PhotoRef) {
+async function loadPhoto({
+  attachmentId,
+  conversationId,
+  senderId,
+  messageId,
+  photoKey,
+  mime,
+}: PhotoRef) {
   const response = await fetch(`/api/photos/${attachmentId}`, { cache: "no-store" });
   if (!response.ok) return null;
   const { ciphertext, iv } = (await response.json()) as { ciphertext: string | null; iv: string };
   if (!ciphertext) return null;
-  const bytes = await decryptPhoto(ciphertext, iv, photoKey, photoAad(conversationId, senderId, messageId));
+  const bytes = await decryptPhoto(
+    ciphertext,
+    iv,
+    photoKey,
+    photoAad(conversationId, senderId, messageId),
+  );
   return new Blob([bytes], { type: mime });
 }
 
@@ -131,7 +143,13 @@ function loadOnce(photo: PhotoRef) {
  * image to long-press and save, and it's only visible while a finger is
  * pressed, for 10 seconds in total. Leaving the app or closing ends it.
  */
-export function OnceViewer({ photo, onClose }: { photo: PhotoRef; onClose: (viewed: boolean) => void }) {
+export function OnceViewer({
+  photo,
+  onClose,
+}: {
+  photo: PhotoRef;
+  onClose: (viewed: boolean) => void;
+}) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const bitmap = useRef<ImageBitmap | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "gone">("loading");
@@ -237,7 +255,9 @@ export function OnceViewer({ photo, onClose }: { photo: PhotoRef; onClose: (view
         <div className="px-8 text-center text-white">
           {status === "loading" ? <p className="text-sm text-white/70">Opening…</p> : null}
           {status === "gone" ? (
-            <p className="text-sm text-white/80">This photo has already been opened, or it&rsquo;s no longer available.</p>
+            <p className="text-sm text-white/80">
+              This photo has already been opened, or it&rsquo;s no longer available.
+            </p>
           ) : null}
           {status === "ready" ? (
             <>

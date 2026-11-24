@@ -11,6 +11,9 @@ export interface Person {
   plannedAt: string | null;
   plannedPrecision: PlanPrecision | null;
   hasKey: boolean;
+  // null when online status isn't shared (either side hides it).
+  online: boolean | null;
+  lastSeenAt: string | null;
 }
 
 export interface ChatSummary {
@@ -30,6 +33,7 @@ export interface AppState {
     displayName: string;
     isAdmin: boolean;
     publicKey: string | null;
+    hideOnline: boolean;
   };
   people: Person[];
   chats: ChatSummary[];

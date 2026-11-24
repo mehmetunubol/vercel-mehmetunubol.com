@@ -1,8 +1,20 @@
 import { test } from "@playwright/test";
-import { BASE, LOCKED, MISMATCH, api, attempt, ok, openGate, signIn } from "./helpers";
+import {
+  BASE,
+  LOCKED,
+  MISMATCH,
+  api,
+  attempt,
+  closeAllWindows,
+  ok,
+  openGate,
+  signIn,
+} from "./helpers";
 
 // Lockout alerts to the admin, and the panic buttons.
 // Runs after the earlier suites, against the data they created.
+
+test.afterEach(({ browser }) => closeAllWindows(browser));
 
 test("security: lockout alerts and panic buttons", async ({ browser }) => {
   const admin = await signIn(browser, "user", "admin-pass-123", "dark");

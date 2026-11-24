@@ -5,6 +5,14 @@
 - **Status bar**: everyone flips themselves _In_ or _Out_ of the office. The
   home screen lists who's in and who's out, and the admin's status is pinned at
   the top.
+- **Online status** (separate from In / Out of the office): someone is
+  _Online_ while they have the app open and on screen, shown as a blue ring
+  around their avatar. Otherwise others see the exact time they were last
+  active ("Last seen 14:05", "Last seen yesterday 09:07"). Leaving the app
+  marks you offline within a second or two. Chats show "typing…".
+  Account → Privacy → _Show when I'm online_ hides your status and typing.
+  It's reciprocal: you then don't see anyone else's either, admin included.
+  Notifications are skipped while you're online, since you're already looking.
 - **Scheduled status**: set when you'll be back or leave ("in 2 h", "today at
   15:00", "Wed 25 Nov, morning"). Morning, afternoon and evening start at 09:00,
   13:00 and 18:00. The status flips automatically when the time arrives, and a
@@ -145,7 +153,7 @@ public keys, password-encrypted private keys, and ciphertext.
   user gets a new key pair and loses access to messages sent to them before the
   reset. Both actions sign the user out on every other device.
 
-Not encrypted: status and scheduled changes, read times, reactions, and events (title, description, time, invitees and answers), and which photos were opened by whom (who
+Not encrypted: status and scheduled changes, online / last seen and typing, read times, reactions, and events (title, description, time, invitees and answers), and which photos were opened by whom (who
 reacted 👍/👎 to which message id). These are metadata the app needs to show
 everyone; message text stays encrypted.
 

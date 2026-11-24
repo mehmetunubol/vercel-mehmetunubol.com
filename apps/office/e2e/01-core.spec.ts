@@ -1,5 +1,5 @@
 import { type Browser, devices, test } from "@playwright/test";
-import { BASE, deleteLocalKeys, ok, signIn } from "./helpers";
+import { BASE, closeAllWindows, deleteLocalKeys, ok, signIn } from "./helpers";
 
 // Sign-in gate, people, private and group chats, sessions, keys and passwords.
 // Later suites build on the users and chats created here.
@@ -13,6 +13,8 @@ async function login(
   const page = await signIn(browser, username, password, scheme);
   return { ctx: page.context(), page };
 }
+
+test.afterEach(({ browser }) => closeAllWindows(browser));
 
 test("core: gate, people, chats, sessions and passwords", async ({ browser }) => {
   // bad password
