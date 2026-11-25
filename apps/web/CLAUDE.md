@@ -32,6 +32,11 @@ Personal site/blog (mehmetunubol.com). Next.js 16 App Router, Tailwind 4.
   groups, Education/Certifications, Contact panel, blog post-listing
   cards, disclosure banners). Don't default new content to `.glass`.
 
+## Analytics
+- Vercel Web Analytics + Speed Insights (`<Analytics />`, `<SpeedInsights />`
+  in `layout.tsx`). Vercel project is on the free Hobby plan by choice: no
+  custom events (`track()` is Pro-only) and no paid analytics tools.
+
 ## WebGL background (homepage + blog index)
 - `src/components/wireframe-scene.tsx` — a single persistent Three.js/
   React Three Fiber scene: a morphing wireframe "brain" solid (icosahedron
