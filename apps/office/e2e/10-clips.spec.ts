@@ -6,12 +6,29 @@ import { BASE, TEST_PNG, api, closeAllWindows, ok, signIn, sql } from "./helpers
 
 test.afterEach(({ browser }) => closeAllWindows(browser));
 
-async function record(page: Page, kind: "Voice note" | "Video") {
+async function record(page: Page, kind: "Voice note" | "Video", switchCamera = false) {
   await page.click('button[aria-label="Attach"]');
   await page.getByRole("menuitem", { name: new RegExp(`^${kind}`) }).click();
   const recorder = page.getByRole("dialog", {
     name: kind === "Voice note" ? "Record a voice note" : "Record a video",
   });
+  if (switchCamera) {
+    const preview = recorder.locator("video");
+    await expect(preview).toHaveClass(/scaleX\(-1\)/);
+    await recorder.getByRole("button", { name: "Switch to the back camera" }).click();
+    await expect(
+      recorder.getByRole("button", { name: "Switch to the front camera" }),
+    ).toBeVisible();
+    ok(
+      !/scaleX\(-1\)/.test((await preview.getAttribute("class")) ?? ""),
+      "the back camera isn't mirrored",
+    );
+    const facing = await preview.evaluate(
+      (el: HTMLVideoElement) =>
+        (el.srcObject as MediaStream).getVideoTracks()[0]!.getConstraints().facingMode,
+    );
+    ok(facing === "environment", "switching asks for the back camera");
+  }
   await recorder.getByRole("button", { name: "Record", exact: true }).click();
   await expect(recorder.getByText(/Recording/)).toBeVisible();
   await page.waitForTimeout(1500);
@@ -78,7 +95,16 @@ test("clips: one-time voice notes and videos", async ({ browser }) => {
   );
 
   // Video.
-  await record(ayse, "Video");
+  // Phones have two cameras; Chromium's fake device is one, so report a second.
+  await ayse.evaluate(() => {
+    const list = navigator.mediaDevices.enumerateDevices.bind(navigator.mediaDevices);
+    navigator.mediaDevices.enumerateDevices = async () => {
+      const devices = await list();
+      const camera = devices.find((d) => d.kind === "videoinput");
+      return camera ? [...devices, camera] : devices;
+    };
+  });
+  await record(ayse, "Video", true);
   await admin.waitForSelector("text=Video · view once");
   await playOnce(admin, "Tap to view once", "video");
   await expect(ayse.getByText(/^Opened$/).last()).toBeVisible({ timeout: 15_000 });

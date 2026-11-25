@@ -225,6 +225,8 @@ export const TR: Record<string, string> = {
   Record: "Kaydet",
   Stop: "Durdur",
   "Record again": "Yeniden kaydet",
+  "Switch to the back camera": "Arka kameraya geç",
+  "Switch to the front camera": "Ön kameraya geç",
 
   // ── Chat details ────────────────────────────────────────────────────
   "Couldn't save that.": "Kaydedilemedi.",

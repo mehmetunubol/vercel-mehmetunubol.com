@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Mic, Square, Video, X } from "lucide-react";
+import { Mic, Square, SwitchCamera, Video, X } from "lucide-react";
 import { MAX_CLIP_SECONDS } from "@/lib/photo";
 import { useI18n } from "@/components/i18n-provider";
 
@@ -49,8 +49,12 @@ export function ClipRecorder({
   const [elapsed, setElapsed] = useState(0);
   const [clip, setClip] = useState<RecordedClip | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Front ("user") or back ("environment") camera, and whether there's a choice.
+  const [facing, setFacing] = useState<"user" | "environment">("user");
+  const [canSwitch, setCanSwitch] = useState(false);
 
-  // Ask for the microphone (and camera) once; release them when closing.
+  // Ask for the microphone (and camera); again after switching cameras.
+  // The tracks are released when closing or before opening the other camera.
   useEffect(() => {
     let cancelled = false;
     navigator.mediaDevices
@@ -58,7 +62,7 @@ export function ClipRecorder({
         audio: true,
         video:
           kind === "video"
-            ? { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }
+            ? { facingMode: facing, width: { ideal: 640 }, height: { ideal: 480 } }
             : false,
       })
       .then((media) => {
@@ -66,6 +70,16 @@ export function ClipRecorder({
         stream.current = media;
         if (preview.current) preview.current.srcObject = media;
         setPhase("ready");
+        // Device names are only listed once access is granted.
+        if (kind === "video") {
+          void navigator.mediaDevices
+            .enumerateDevices()
+            .then((devices) => {
+              if (!cancelled)
+                setCanSwitch(devices.filter((d) => d.kind === "videoinput").length > 1);
+            })
+            .catch(() => {});
+        }
       })
       .catch(() => {
         if (cancelled) return;
@@ -84,7 +98,12 @@ export function ClipRecorder({
       stream.current?.getTracks().forEach((t) => t.stop());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the language never changes while open
-  }, [kind]);
+  }, [kind, facing]);
+
+  function switchCamera() {
+    setPhase("starting");
+    setFacing((f) => (f === "user" ? "environment" : "user"));
+  }
 
   // Countdown while recording; stop at the limit.
   useEffect(() => {
@@ -154,13 +173,30 @@ export function ClipRecorder({
         </div>
 
         {kind === "video" ? (
-          <video
-            ref={preview}
-            autoPlay
-            muted
-            playsInline
-            className="mx-auto aspect-[4/3] w-full rounded-2xl bg-black object-cover [transform:scaleX(-1)]"
-          />
+          <div className="relative">
+            <video
+              ref={preview}
+              autoPlay
+              muted
+              playsInline
+              // Mirror only the selfie camera, like the phone's own camera app.
+              className={`mx-auto aspect-[4/3] w-full rounded-2xl bg-black object-cover ${facing === "user" ? "[transform:scaleX(-1)]" : ""}`}
+            />
+            {canSwitch && phase === "ready" ? (
+              <button
+                type="button"
+                aria-label={
+                  facing === "user"
+                    ? t("Switch to the back camera")
+                    : t("Switch to the front camera")
+                }
+                onClick={switchCamera}
+                className="absolute right-2 bottom-2 grid size-10 place-items-center rounded-full bg-black/50 text-white"
+              >
+                <SwitchCamera size={19} />
+              </button>
+            ) : null}
+          </div>
         ) : (
           <div
             className={`mx-auto grid size-24 place-items-center rounded-full ${phase === "recording" ? "bg-[color-mix(in_oklab,var(--danger)_18%,transparent)] text-[var(--danger)]" : "bg-[var(--field)]"}`}
