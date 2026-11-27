@@ -1,9 +1,11 @@
 /**
- * Generates the CV as .docx and .pdf directly from src/lib/site.ts, so the
- * downloadable CV can never drift from the website content. Run via
- * `pnpm generate:cv`. Outputs to public/MehmetUnubol_CV.docx and
- * public/MehmetUnubol_CV.pdf, which is what the homepage "Download CV"
- * button links to.
+ * Generates a CV as .docx and .pdf from src/lib/site.ts. Run via
+ * `pnpm generate:cv`. Outputs to .cv-generated/ (gitignored) for preview only.
+ *
+ * The downloadable CV in public/MehmetUnubol_CV.{pdf,docx} is NOT generated
+ * here any more: it is exported from Mehmet's own Google Doc
+ * ("Mehmet_Unubol_CV_2026 (public, no phone)"), so this script must never write
+ * to public/.
  */
 import fs from "fs";
 import path from "path";
@@ -38,7 +40,7 @@ function sectionHeadingParagraph(text: string): Paragraph {
   });
 }
 
-const OUT_DIR = path.join(__dirname, "..", "public");
+const OUT_DIR = path.join(__dirname, "..", ".cv-generated");
 const DOCX_PATH = path.join(OUT_DIR, "MehmetUnubol_CV.docx");
 const PDF_PATH = path.join(OUT_DIR, "MehmetUnubol_CV.pdf");
 

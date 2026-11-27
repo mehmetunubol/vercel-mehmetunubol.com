@@ -11,11 +11,22 @@ description: >
 
 ## Purpose
 
-`apps/web/src/lib/site.ts` is the single source of truth for both the website
-content (homepage, skills, experience, projects) and the downloadable CV
-(`public/MehmetUnubol_CV.docx` / `.pdf`, generated from that same file). Never
-edit the CV files directly — they get overwritten by the generator. Any CV
-update is really a `site.ts` update followed by regeneration.
+There are two sources, kept in sync by hand (since 2026-11):
+
+- **Downloadable CV** (`apps/web/public/MehmetUnubol_CV.pdf` / `.docx`, linked
+  from the homepage "Download CV" button): exported from the Google Doc
+  "Mehmet_Unubol_CV_2026 (public, no phone)" in Mehmet's Google Drive, a copy
+  of his main CV "Mehmet_Unubol_CV_2026 (working copy)" with the phone number
+  removed. When the main CV changes, re-copy it (Drive `copy_file`), strip the
+  phone line (Docs `update_doc` replaceAllText), then export PDF and DOCX
+  (Drive `download_file_content` with `exportMimeType`) over the two files in
+  `public/`. Check the exports with `pdftotext` that no phone number remains.
+- **Website content**: `apps/web/src/lib/site.ts`. When the CV changes,
+  update `site.ts` to match it.
+
+`pnpm generate:cv` still builds a CV from `site.ts`, but only into
+`apps/web/.cv-generated/` (gitignored) as a preview. It must never write to
+`public/` again, or it would replace Mehmet's real CV.
 
 ## Process
 
@@ -33,18 +44,16 @@ update is really a `site.ts` update followed by regeneration.
    - Keep `site.resumeTitle` and `site.summary` in sync with how the CV
      should read; these feed the generated CV header/summary directly.
 2. Typecheck: `cd apps/web && pnpm typecheck` (or `npx tsc --noEmit`).
-3. Regenerate the CV files: `cd apps/web && pnpm generate:cv`. This overwrites
-   `public/MehmetUnubol_CV.docx` and `public/MehmetUnubol_CV.pdf` from the
-   current `site.ts` — the homepage "Download CV" button already links to
-   `/MehmetUnubol_CV.pdf`, so no other wiring is needed.
-4. Sanity-check the output: read the generated PDF back (Read tool handles
-   PDFs) and confirm the new/changed content appears correctly, especially
-   Turkish characters (İzmir, Türkiye, Ünübol) if experience locations were
-   touched.
+3. If the CV itself changed, re-export the Google Doc to
+   `public/MehmetUnubol_CV.pdf` and `.docx` (see Purpose). The homepage button
+   already links to `/MehmetUnubol_CV.pdf`.
+4. Sanity-check: read the PDF in `public/` back (Read tool handles PDFs) and
+   compare it with `site.ts` (roles, dates, skills, projects).
 5. Run `pnpm build` in `apps/web` to confirm nothing broke.
 
 ## Known gotchas (do not reintroduce)
 
+- (The next two apply only to the preview generator.)
 - **Turkish characters**: `scripts/generate-cv.ts` embeds `dejavu-fonts-ttf`
   (`DejaVuSans.ttf/-Bold/-Oblique`) instead of pdfkit's default Helvetica,
   because Helvetica's WinAnsi encoding mangles İ/ı/ü/ş/ğ/ç. If you touch font
@@ -70,9 +79,10 @@ update is really a `site.ts` update followed by regeneration.
 
 ## Boundaries
 
-- Don't hand-edit `public/MehmetUnubol_CV.docx` or `.pdf` — always go through
-  `site.ts` + `pnpm generate:cv`, or the next regeneration silently discards
-  the edit.
+- Don't hand-edit or regenerate `public/MehmetUnubol_CV.docx` or `.pdf` —
+  they are exports of Mehmet's Google Doc. Change the doc, then re-export.
+- Never publish the CV with the phone number (scam/spam risk). Keep it out
+  of `public/` and out of `site.ts`.
 - Don't add data that isn't true of the actual CV/background — if unsure
   whether something belongs (e.g. a skill, a date range), ask rather than
   guess.

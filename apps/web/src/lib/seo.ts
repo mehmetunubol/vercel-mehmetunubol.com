@@ -21,6 +21,8 @@ export const keywords = [
   "Node.js Developer",
   "TypeScript",
   "Microservices",
+  "AI/LLM Applications",
+  "Anthropic API",
   "Full-Stack Developer",
   "İzmir",
   "Turkey",

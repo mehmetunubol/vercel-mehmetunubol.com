@@ -22,7 +22,7 @@ const plexMono = IBM_Plex_Mono({
   display: "swap",
 });
 
-const description = `${site.name} is a full-stack software engineer based in ${site.location} with 10+ years of experience, specializing in Node.js, TypeScript, and cloud-native microservices.`;
+const description = `${site.name} is a backend engineer based in ${site.location} with 10+ years of experience, specializing in Node.js, TypeScript, event-driven microservices, and LLM-powered applications.`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
